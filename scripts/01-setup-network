@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+
+cd "${0%/*}"
+. ./functions.sh
+read_config
+
+info "####################"
+info "# NETWORKING SETUP #"
+info "####################"
+
+if ! ip link show "${DL_BRIDGE_NAME}" > /dev/null 2>&1; then
+	info "Creating bridge device ${DL_BRIDGE_NAME}"
+	sudo ip link add "${DL_BRIDGE_NAME}" type bridge
+else
+	info "Bridge device ${DL_BRIDGE_NAME} already exists"
+	exit 0
+fi
+
+info "Setting address on bridge device ${DL_BRIDGE_NAME} to ${DL_BRIDGE_ADDRESS}/${DL_BRIDGE_PREFIX_LEN}"
+sudo ip addr add "${DL_BRIDGE_ADDRESS}/${DL_BRIDGE_PREFIX_LEN}" dev "${DL_BRIDGE_NAME}" > /dev/null 2>&1 || true
+
+info "Bringing up bridge device ${DL_BRIDGE_NAME}"
+sudo ip link set "${DL_BRIDGE_NAME}" up qlen 10000
+
+if ! sudo iptables -t nat -C POSTROUTING			\
+	  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+	! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+	  -m comment --comment="debops-lab"			\
+	  -j MASQUERADE; then
+	info "Adding firewall masquerade rule for bridge network egress"
+	sudo iptables -t nat -A POSTROUTING				\
+		  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+		! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+		  -m comment --comment="debops-lab"			\
+		  -j MASQUERADE
+fi
+
+function add_tap {
+	info "Adding network device $1"
+	sudo ip tuntap add dev "$1" mode tap user "$USER" || true
+	sudo ip link set "$1" master "${DL_BRIDGE_NAME}"
+	sudo ip link set "$1" up qlen 10000
+}
+
+add_tap tap1
+add_tap tap2
+add_tap tap3
+add_tap tap4
+
+info "Setting up IPv4 forwarding"
+sudo sh -c 'echo 1 >> /proc/sys/net/ipv4/ip_forward'
+
+info ""
+

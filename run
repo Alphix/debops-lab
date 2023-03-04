@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+
+#. ./default.cfg
+#
+#if [ -e "custom.cfg" ]; then
+#	. ./custom.cfg
+#fi
+
+./scripts/01-setup-network
+./scripts/02-prepare-files
+./scripts/03-launch-boot-server
+
