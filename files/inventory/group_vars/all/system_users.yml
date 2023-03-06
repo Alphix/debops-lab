@@ -1,0 +1,5 @@
+# This overrides only the SSH key set for the default system user
+system_users__accounts:
+
+  - name: '{{ system_users__self_name }}'
+    sshkeys: '{{ lookup("pipe", "cat ~/.ssh/debops-lab/*.pub") }}'

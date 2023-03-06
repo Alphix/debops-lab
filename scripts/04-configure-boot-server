@@ -17,12 +17,16 @@ if [ ! -e "project" ]; then
 	debops project init "project" > /dev/null
 	cd "./project"
 	cp "../files/debops.cfg" "./.debops.cfg"
+	rm -rf "./ansible/inventory"
+	ln -sf "../../files/inventory" "./ansible/inventory"
 	debops project refresh > /dev/null
 else
 	cd "./project"
 fi
 
-#debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
+export ANSIBLE_STRATEGY=mitogen_linear
+
+debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
 #debops run common -l "${HOST_NAME}"
 #debops run service/tftpd -l "${HOST_NAME}"
 #debops run service/dhcpd -l "${HOST_NAME}"
