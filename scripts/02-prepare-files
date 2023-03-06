@@ -13,39 +13,6 @@ if [ ! -d "tmp" ]; then
 fi
 cd "tmp"
 
-function get_file {
-	local file="$1"
-	local uri="$2"
-
-	if [ -e "${file}" ]; then
-		info "Checking for an updated ${file}"
-		zflag=(-z "${file}")
-	else
-		info "Downloading file ${file}"
-		zflag=()
-	fi
-	curl -s -o "${file}" "${zflag[@]}" "$uri"
-}
-
-get_file "initrd.gz" "${DL_INITRD_URL}"
-get_file "linux" "${DL_KERNEL_URL}"
-
-if [ ! -e "../files/preseed.cfg" ]; then
-	info "Preseed file missing"
-	exit 1
-elif [ ! -e "preseed.cfg" ] || [ "../files/preseed.cfg" -nt "preseed.cfg" ]; then
-	cp "../files/preseed.cfg" preseed.cfg
-fi
-
-if [ ! -e "initrd-mod.gz" ] || [ "preseed.cfg" -nt "initrd-mod.gz" ] || [ "initrd.gz" -nt "initrd-mod.gz" ]; then
-	info "Creating updated initrd including preseed.cfg"
-	rm -f initrd-mod.gz
-	gunzip --keep initrd.gz
-	echo preseed.cfg | cpio -H newc -o -A -F initrd --quiet
-	mv initrd initrd-mod
-	gzip initrd-mod
-fi
-
 if [ ! -d "ssh" ]; then
 	mkdir "ssh"
 fi
@@ -72,6 +39,53 @@ fi
 if [ ! -e ~/.ssh/debops-lab ]; then
 	ln -sf "${PWD}" ~/.ssh/debops-lab
 fi
+
+cd ..
+
+function get_file {
+	local file="$1"
+	local uri="$2"
+
+	if [ -e "${file}" ]; then
+		info "Checking for an updated ${file}"
+		zflag=(-z "${file}")
+	else
+		info "Downloading file ${file}"
+		zflag=()
+	fi
+	curl -s -o "${file}" "${zflag[@]}" "$uri"
+}
+
+get_file "initrd.gz" "${DL_INITRD_URL}"
+get_file "linux" "${DL_KERNEL_URL}"
+
+if [ ! -e "../files/preseed.cfg.template" ]; then
+	info "Preseed template file missing"
+	exit 1
+elif [ ! -e "preseed.cfg" ] || [ "../files/preseed.cfg.template" -nt "preseed.cfg" ]; then
+	cp "../files/preseed.cfg.template" preseed.cfg
+	echo "d-i passwd/root-password password ${DL_DI_ROOT_PW}" >> preseed.cfg
+	echo "d-i passwd/root-password-again password ${DL_DI_ROOT_PW}" >> preseed.cfg
+	echo "d-i debian-installer/country string ${DL_DI_COUNTRY}" >> preseed.cfg
+	echo "d-i debian-installer/locale string ${DL_DI_LOCALE}" >> preseed.cfg
+	echo "d-i keyboard-configuration/xkb-keymap select ${DL_DI_KEYMAP}" >> preseed.cfg
+	echo "d-i mirror/http/hostname string ${DL_DI_MIRROR}" >> preseed.cfg
+	if [ ! -z "${DL_DI_PROXY}" ]; then
+		echo "d-i mirror/http/proxy string ${DL_DI_PROXY}" >> preseed.cfg
+	fi
+	echo "d-i time/zone string ${DL_DI_TZ}" >> preseed.cfg
+	echo "d-i preseed/late_command string in-target sh -c \"mkdir -m 700 /root/.ssh; echo '$(cat ~/.ssh/debops-lab/*.pub)' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys\"" >> preseed.cfg
+fi
+
+if [ ! -e "initrd-mod.gz" ] || [ "preseed.cfg" -nt "initrd-mod.gz" ] || [ "initrd.gz" -nt "initrd-mod.gz" ]; then
+	info "Creating updated initrd including preseed.cfg"
+	rm -f initrd-mod.gz
+	gunzip --keep initrd.gz
+	echo preseed.cfg | cpio -H newc -o -A -F initrd --quiet
+	mv initrd initrd-mod
+	gzip initrd-mod
+fi
+
 
 info ""
 exit 0

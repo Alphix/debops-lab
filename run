@@ -11,4 +11,5 @@ set -Eeuo pipefail
 ./scripts/01-setup-network
 ./scripts/02-prepare-files
 ./scripts/03-launch-boot-server
+./scripts/04-configure-boot-server
 
