@@ -1,0 +1,46 @@
+!/bin/bash
+
+set -Eeuo pipefail
+set -x
+
+cd "${0%/*}"
+. ./functions.sh
+read_config
+
+info "#############################"
+info "# BOOT SERVER CONFIGURATION #"
+info "#############################"
+
+GUEST_NAME="boot"
+QEMU_IMG="${GUEST_NAME}.img"
+GUEST_SSH_KNOWN_HOSTS="../ssh/known_host.${GUEST_NAME}"
+
+if [ ! -e "../data/${QEMU_IMG}" ]; then
+	info "Boot server image not found"
+	exit 1
+fi
+
+if [ ! -e "${GUEST_SSH_KNOWN_HOSTS}" ]; then
+	info "Boot server SSH access not configured"
+	exit 1
+fi
+
+activate_python_virtualenv
+
+if [ ! -e "../debops-project" ]; then
+	info "Creating DebOps project"
+	debops project init "../debops-project" > /dev/null
+	cp "../files/ansible_inventory_example" "../debops-project/ansible/inventory/hosts"
+fi
+
+cd "../debops-project"
+debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
+#debops run common -l "${HOST_NAME}"
+#debops run service/tftpd -l "${HOST_NAME}"
+#debops run service/dhcpd -l "${HOST_NAME}"
+#debops run service/ipxe -l "${HOST_NAME}"
+
+info "Host ${GUEST_NAME} configured"
+
+exit 0
+

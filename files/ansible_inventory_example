@@ -1,0 +1,30 @@
+# This is an Ansible inventory file in INI format. You can define a list of
+# hosts and groups to be managed by this particular inventory.
+
+# Hosts listed under [debops_all_hosts] will have common DebOps plays
+# ran against them. It will include services such as iptables, DNS, Postfix,
+# sshd configuration and more.
+#
+# View the list here:
+# https://github.com/debops/debops/blob/master/ansible/playbooks/common.yml
+#
+# You should check Getting Started guide for useful suggestions:
+# https://docs.debops.org/en/master/introduction/getting-started.html
+
+# Your host is eligible to be managed by DebOps' common playbook. If you want
+# that functionality and more, then uncomment your hostname below.
+
+[debops_all_hosts]
+boot ansible_host=boot.example.com
+qtest1 ansible_host=qtest1.example.com
+qtest2 ansible_host=qtest2.example.com
+qtest3 ansible_host=qtest3.example.com
+
+[qemu_service_tftpd]
+boot
+
+[qemu_service_dhcpd]
+boot
+
+[qemu_service_ipxe]
+boot

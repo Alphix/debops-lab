@@ -75,6 +75,6 @@ if [ "$ONLINE" -ne 1 ]; then
 	exit 1
 fi
 
-echo "${GUEST_NAME} online and accepting SSH connections"
+echo "Guest ${GUEST_NAME} online and accepting SSH connections"
 
 exit 0
