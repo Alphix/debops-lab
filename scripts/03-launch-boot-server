@@ -22,6 +22,7 @@ QEMU_IMG="${GUEST_NAME}.img"
 QEMU_EXTRA_OPTS="-name ${GUEST_NAME} -drive file=${QEMU_IMG},format=qcow2,cache=unsafe,if=virtio,aio=io_uring -device virtio-net,netdev=network0,mac=52:54:00:00:00:01 -netdev tap,id=network0,ifname=tap1,script=no,downscript=no"
 GUEST_SSH_KNOWN_HOSTS="../tmp/ssh/hosts/known_host.${GUEST_NAME}"
 GUEST_SSH_CONFIG="../tmp/ssh/hosts/${GUEST_NAME}.conf"
+SSH_CONFIG="../tmp/ssh/ssh_config"
 
 FRESH_INSTALL=0
 
@@ -69,7 +70,7 @@ Host ${GUEST_NAME} ${GUEST_NAME}.${DL_DOMAIN} ${GUEST_IP}
 	UserKnownHostsFile ~/.ssh/debops-lab/hosts/known_host.${GUEST_NAME}
 EOF
 
-	if ssh -F "${GUEST_SSH_CONFIG}" "root@${GUEST_NAME}" hostname > /dev/null 2>&1; then
+	if ssh -F "${SSH_CONFIG}" "root@${GUEST_NAME}" hostname > /dev/null 2>&1; then
 		ONLINE=1
 		break
 	fi

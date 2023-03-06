@@ -16,7 +16,8 @@ if [ ! -e "project" ]; then
 	info "Creating DebOps project"
 	debops project init "project" > /dev/null
 	cd "./project"
-	cp "../files/debops.cfg" "./.debops.cfg"
+	cp "../files/debops.cfg.template" "./.debops.cfg"
+	echo "ssh_args = -F \"${HOME}/.ssh/debops-lab/ssh_config\"" >> "./.debops.cfg"
 	rm -rf "./ansible/inventory"
 	ln -sf "../../files/inventory" "./ansible/inventory"
 	debops project refresh > /dev/null
