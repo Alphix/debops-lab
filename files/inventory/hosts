@@ -28,3 +28,7 @@ boot
 
 [debops_service_ipxe]
 boot
+
+[debops_service_dnsmasq]
+boot
+

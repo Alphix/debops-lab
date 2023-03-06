@@ -21,6 +21,16 @@ if [ ! -e "project" ]; then
 	rm -rf "./ansible/inventory"
 	ln -sf "../../files/inventory" "./ansible/inventory"
 	debops project refresh > /dev/null
+
+	if [ ! -z "${DL_CUSTOM_DEBOPS_REPO}" ]; then
+		git clone --quiet "${DL_CUSTOM_DEBOPS_REPO}" debops
+		if [ ! -z "$DL_CUSTOM_DEBOPS_REPO_BRANCH" ]; then
+			cd "./debops"
+			git checkout "${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
+			cd ".."
+		fi
+		pip3 install --editable .
+	fi
 else
 	cd "./project"
 fi
