@@ -1,18 +1,15 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-
 cd "${0%/*}"
 . ./functions.sh
-read_config
 
 info "###########################"
 info "# BOOT SERVER PREPARATION #"
 info "###########################"
 
-cd ..
-if [ ! -d "ssh" ]; then
-	mkdir "ssh"
+if [ ! -d "tmp/ssh/hosts" ]; then
+	mkdir -p "tmp/ssh/hosts"
 fi
 if [ ! -d "data" ]; then
 	mkdir "data"
@@ -20,9 +17,11 @@ fi
 cd "data"
 
 GUEST_NAME="boot"
+GUEST_IP="192.168.99.1"
 QEMU_IMG="${GUEST_NAME}.img"
 QEMU_EXTRA_OPTS="-name ${GUEST_NAME} -drive file=${QEMU_IMG},format=qcow2,cache=unsafe,if=virtio,aio=io_uring -device virtio-net,netdev=network0,mac=52:54:00:00:00:01 -netdev tap,id=network0,ifname=tap1,script=no,downscript=no"
-GUEST_SSH_KNOWN_HOSTS="../ssh/known_host.${GUEST_NAME}"
+GUEST_SSH_KNOWN_HOSTS="../tmp/ssh/hosts/known_host.${GUEST_NAME}"
+GUEST_SSH_CONFIG="../tmp/ssh/hosts/${GUEST_NAME}.conf"
 
 FRESH_INSTALL=0
 
@@ -30,17 +29,17 @@ if [ ! -e "${QEMU_IMG}" ]; then
 	FRESH_INSTALL=1
 	rm -f "${GUEST_SSH_KNOWN_HOSTS}"
 	info "Performing fresh install of ${GUEST_NAME}"
-	qemu-img create -f qcow2 "${QEMU_IMG}" "${DL_QEMU_DISK_SIZE}"
+	qemu-img create -f qcow2 "${QEMU_IMG}" "${DL_QEMU_DISK_SIZE}" > /dev/null
 	gnome-terminal --tab --wait --title "${GUEST_NAME}-install" --		\
 		qemu-system-x86_64						\
 		${DL_QEMU_OPTS}							\
 		$QEMU_EXTRA_OPTS						\
 		-kernel ../tmp/linux						\
 		-initrd ../tmp/initrd-mod.gz					\
-		-append "quiet DEBIAN_FRONTEND=text console=ttyS0,115200,n8 auto=true priority=critical netcfg/disable_autoconfig=true netcfg/get_ipaddress=192.168.99.1 netcfg/get_netmask=255.255.255.0 netcfg/get_gateway=${DL_BRIDGE_ADDRESS} netcfg/get_nameservers=${DL_NAMESERVER} hostname=${HOST_NAME} domain=${DL_DOMAIN}"
+		-append "quiet DEBIAN_FRONTEND=text console=ttyS0,115200,n8 auto=true priority=critical netcfg/disable_autoconfig=true netcfg/get_ipaddress=${GUEST_IP} netcfg/get_netmask=255.255.255.0 netcfg/get_gateway=${DL_BRIDGE_ADDRESS} netcfg/get_nameservers=${DL_NAMESERVER} hostname=${GUEST_NAME} domain=${DL_DOMAIN}"
 fi
 
-if ! lsof "${QEMU_IMG}"; then
+if ! lsof "${QEMU_IMG}" > /dev/null; then
 	info "Starting ${GUEST_NAME}"
 	gnome-terminal --tab --title "${GUEST_NAME}" --				\
 		qemu-system-x86_64						\
@@ -54,17 +53,23 @@ info "Waiting for ${GUEST_NAME} to be reachable via SSH"
 for i in $(seq 100); do
 	sleep 3
 
-	if ! ping -c1 -q 192.168.99.1 > /dev/null 2>&1; then
+	if ! ping -c1 -q "${GUEST_IP}" > /dev/null 2>&1; then
 		continue
 	fi
 
 	if [ ! -e "${GUEST_SSH_KNOWN_HOSTS}" ]; then
-		if ! ssh-keyscan 192.168.99.1 > "${GUEST_SSH_KNOWN_HOSTS}" 2> /dev/null; then
+		if ! ssh-keyscan "${GUEST_IP}" > "${GUEST_SSH_KNOWN_HOSTS}" 2> /dev/null; then
 			continue
 		fi
 	fi
 
-	if ssh -o "UserKnownHostsFile=${GUEST_SSH_KNOWN_HOSTS}" root@192.168.99.1 hostname > /dev/null 2>&1; then
+	cat <<EOF > "${GUEST_SSH_CONFIG}"
+Host ${GUEST_NAME} ${GUEST_NAME}.${DL_DOMAIN} ${GUEST_IP}
+	Hostname ${GUEST_IP}
+	UserKnownHostsFile ~/.ssh/debops-lab/hosts/known_host.${GUEST_NAME}
+EOF
+
+	if ssh -F "${GUEST_SSH_CONFIG}" "root@${GUEST_NAME}" hostname > /dev/null 2>&1; then
 		ONLINE=1
 		break
 	fi
@@ -77,4 +82,5 @@ fi
 
 echo "Guest ${GUEST_NAME} online and accepting SSH connections"
 
+info ""
 exit 0

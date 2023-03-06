@@ -1,10 +1,8 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-
 cd "${0%/*}"
 . ./functions.sh
-read_config
 
 info "####################"
 info "# NETWORKING SETUP #"
@@ -15,6 +13,7 @@ if ! ip link show "${DL_BRIDGE_NAME}" > /dev/null 2>&1; then
 	sudo ip link add "${DL_BRIDGE_NAME}" type bridge
 else
 	info "Bridge device ${DL_BRIDGE_NAME} already exists"
+	info ""
 	exit 0
 fi
 
@@ -53,4 +52,4 @@ info "Setting up IPv4 forwarding"
 sudo sh -c 'echo 1 >> /proc/sys/net/ipv4/ip_forward'
 
 info ""
-
+exit 0

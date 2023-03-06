@@ -1,16 +1,13 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-
 cd "${0%/*}"
 . ./functions.sh
-read_config
 
 info "####################"
 info "# FILE PREPARATION #"
 info "####################"
 
-cd ..
 if [ ! -d "tmp" ]; then
 	mkdir "tmp"
 fi
@@ -49,4 +46,32 @@ if [ ! -e "initrd-mod.gz" ] || [ "preseed.cfg" -nt "initrd-mod.gz" ] || [ "initr
 	gzip initrd-mod
 fi
 
+if [ ! -d "ssh" ]; then
+	mkdir "ssh"
+fi
+cd "ssh"
+
+if [ ! -e "id_ed25519" ]; then
+	info "Generating a SSH key"
+	ssh-keygen -t ed25519 -f "id_ed25519" -C "debops-lab-${USER}" -N "" -q
+fi
+
+if [ ! -e "ssh_config" ]; then
+	info "Installing custom ssh_config"
+	cp "../../files/ssh_config" "./"
+fi
+
+if [ ! -d "hosts" ]; then
+	mkdir "hosts"
+fi
+
+if [ ! -e ~/.ssh ]; then
+	mkdir --mode=0700 ~/.ssh
+fi
+
+if [ ! -e ~/.ssh/debops-lab ]; then
+	ln -sf "${PWD}" ~/.ssh/debops-lab
+fi
+
+info ""
 exit 0

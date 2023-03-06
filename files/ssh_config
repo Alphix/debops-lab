@@ -1,0 +1,7 @@
+CanonicalizeHostname yes
+CanonicalizeMaxDots 0
+CanonicalDomains example.com
+
+IdentityFile ~/.ssh/debops-lab/id_ed25519
+
+Include ~/.ssh/debops-lab/hosts/*.conf
