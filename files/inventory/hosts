@@ -20,11 +20,11 @@ qtest1 ansible_host=qtest1.example.com
 qtest2 ansible_host=qtest2.example.com
 qtest3 ansible_host=qtest3.example.com
 
-[qemu_service_tftpd]
+[debops_service_tftpd]
 boot
 
-[qemu_service_dhcpd]
+[debops_service_dhcpd]
 boot
 
-[qemu_service_ipxe]
+[debops_service_ipxe]
 boot

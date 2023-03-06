@@ -28,10 +28,10 @@ fi
 export ANSIBLE_STRATEGY=mitogen_linear
 
 debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
-#debops run common -l "${HOST_NAME}"
-#debops run service/tftpd -l "${HOST_NAME}"
-#debops run service/dhcpd -l "${HOST_NAME}"
-#debops run service/ipxe -l "${HOST_NAME}"
+debops run common -l "${GUEST_NAME}"
+debops run service/tftpd -l "${GUEST_NAME}"
+debops run service/dhcpd -l "${GUEST_NAME}"
+debops run service/ipxe -l "${GUEST_NAME}"
 
 info "Host ${GUEST_NAME} configured"
 
