@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+cd "${0%/*}"
+. ./functions.sh
+
+info "############################"
+info "# QTEST SERVER PREPARATION #"
+info "############################"
+
+start_vm "qtest1" "1"
+start_vm "qtest2" "2"
+start_vm "qtest3" "3"
+
+info ""
+exit 0

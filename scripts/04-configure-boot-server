@@ -25,9 +25,9 @@ if [ ! -e "project" ]; then
 		git clone --quiet "${DL_CUSTOM_DEBOPS_REPO}" debops
 		cd "./debops"
 		if [ ! -z "$DL_CUSTOM_DEBOPS_REPO_BRANCH" ]; then
-			git checkout "${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
+			git checkout --quiet "${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
 		fi
-		pip3 install --editable .
+		pip3 install --editable . > /dev/null 2>&1
 		cd ".."
 	fi
 

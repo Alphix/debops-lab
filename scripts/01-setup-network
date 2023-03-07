@@ -27,7 +27,7 @@ if ! sudo iptables -t nat -C POSTROUTING			\
 	  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
 	! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
 	  -m comment --comment="debops-lab"			\
-	  -j MASQUERADE; then
+	  -j MASQUERADE > /dev/null 2>&1; then
 	info "Adding firewall masquerade rule for bridge network egress"
 	sudo iptables -t nat -A POSTROUTING				\
 		  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
@@ -43,10 +43,10 @@ function add_tap {
 	sudo ip link set "$1" up qlen 10000
 }
 
+add_tap tap253
 add_tap tap1
 add_tap tap2
 add_tap tap3
-add_tap tap4
 
 info "Setting up IPv4 forwarding"
 sudo sh -c 'echo 1 >> /proc/sys/net/ipv4/ip_forward'

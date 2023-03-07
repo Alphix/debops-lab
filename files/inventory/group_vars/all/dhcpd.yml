@@ -2,24 +2,24 @@ dhcpd__authoritative: True
 
 dhcpd__ipxe: True
 
-dhcpd__name_servers: [ '192.168.99.1' ]
+dhcpd__name_servers: [ '192.168.99.253' ]
 
 dhcpd__hosts:
   - hostname: 'qtest1'
-    address4: '192.168.99.2'
-    ethernet: '52:54:00:00:00:02'
+    address4: '192.168.99.1'
+    ethernet: '52:54:00:00:00:01'
     options: |
       option host-name "qtest1";
 
   - hostname: 'qtest2'
-    address4: '192.168.99.3'
-    ethernet: '52:54:00:00:00:03'
+    address4: '192.168.99.2'
+    ethernet: '52:54:00:00:00:02'
     options: |
       option host-name "qtest2";
 
   - hostname: 'qtest3'
-    address4: '192.168.99.4'
-    ethernet: '52:54:00:00:00:04'
+    address4: '192.168.99.3'
+    ethernet: '52:54:00:00:00:03'
     options: |
       option host-name "qtest3";
 
@@ -31,8 +31,8 @@ dhcpd__subnets:
       - comment: 'Reserved for static assignments'
         options: |
           deny unknown-clients;
-        ranges: [ '192.168.99.2 192.168.99.99' ]
+        ranges: [ '192.168.99.1 192.168.99.99' ]
 
       - comment: 'Pool for dynamic clients'
-        ranges: [ '192.168.99.100 192.168.99.254' ]
+        ranges: [ '192.168.99.100 192.168.99.252' ]
 

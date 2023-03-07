@@ -8,81 +8,27 @@ info "###########################"
 info "# BOOT SERVER PREPARATION #"
 info "###########################"
 
-if [ ! -d "tmp/ssh/hosts" ]; then
-	mkdir -p "tmp/ssh/hosts"
-fi
-if [ ! -d "data" ]; then
-	mkdir "data"
-fi
-cd "data"
-
 GUEST_NAME="boot"
-GUEST_IP="192.168.99.1"
-QEMU_IMG="${GUEST_NAME}.img"
-QEMU_EXTRA_OPTS="-name ${GUEST_NAME} -drive file=${QEMU_IMG},format=qcow2,cache=unsafe,if=virtio,aio=io_uring -device virtio-net,netdev=network0,mac=52:54:00:00:00:01 -netdev tap,id=network0,ifname=tap1,script=no,downscript=no"
-GUEST_SSH_KNOWN_HOSTS="../tmp/ssh/hosts/known_host.${GUEST_NAME}"
-GUEST_SSH_CONFIG="../tmp/ssh/hosts/${GUEST_NAME}.conf"
-SSH_CONFIG="../tmp/ssh/ssh_config"
+GUEST_IP="192.168.99.253"
 
-FRESH_INSTALL=0
+BOOT_APPEND="quiet"
+BOOT_APPEND+=" DEBIAN_FRONTEND=text"
+BOOT_APPEND+=" console=ttyS0,115200,n8"
+BOOT_APPEND+=" auto=true"
+BOOT_APPEND+=" priority=critical"
+BOOT_APPEND+=" netcfg/disable_autoconfig=true"
+BOOT_APPEND+=" netcfg/get_ipaddress=${GUEST_IP}"
+BOOT_APPEND+=" netcfg/get_netmask=255.255.255.0"
+BOOT_APPEND+=" netcfg/get_gateway=${DL_BRIDGE_ADDRESS}"
+BOOT_APPEND+=" netcfg/get_nameservers=${DL_NAMESERVER}"
+BOOT_APPEND+=" hostname=${GUEST_NAME}"
+BOOT_APPEND+=" domain=${DL_DOMAIN}"
 
-if [ ! -e "${QEMU_IMG}" ]; then
-	FRESH_INSTALL=1
-	rm -f "${GUEST_SSH_KNOWN_HOSTS}"
-	info "Performing fresh install of ${GUEST_NAME}"
-	qemu-img create -f qcow2 "${QEMU_IMG}" "${DL_QEMU_DISK_SIZE}" > /dev/null
-	gnome-terminal --tab --wait --title "${GUEST_NAME}-install" --		\
-		qemu-system-x86_64						\
-		${DL_QEMU_OPTS}							\
-		$QEMU_EXTRA_OPTS						\
-		-kernel ../tmp/linux						\
-		-initrd ../tmp/initrd-mod.gz					\
-		-append "quiet DEBIAN_FRONTEND=text console=ttyS0,115200,n8 auto=true priority=critical netcfg/disable_autoconfig=true netcfg/get_ipaddress=${GUEST_IP} netcfg/get_netmask=255.255.255.0 netcfg/get_gateway=${DL_BRIDGE_ADDRESS} netcfg/get_nameservers=${DL_NAMESERVER} hostname=${GUEST_NAME} domain=${DL_DOMAIN}"
-fi
+BOOT_ARGS=("-kernel" "./tmp/linux")
+BOOT_ARGS+=("-initrd" "./tmp/initrd-mod.gz")
+BOOT_ARGS+=("-append" "${BOOT_APPEND}")
 
-if ! lsof "${QEMU_IMG}" > /dev/null; then
-	info "Starting ${GUEST_NAME}"
-	gnome-terminal --tab --title "${GUEST_NAME}" --				\
-		qemu-system-x86_64						\
-		${DL_QEMU_OPTS}							\
-		$QEMU_EXTRA_OPTS
-fi
-
-ONLINE=0
-
-info "Waiting for ${GUEST_NAME} to be reachable via SSH"
-for i in $(seq 100); do
-	sleep 3
-
-	if ! ping -c1 -q "${GUEST_IP}" > /dev/null 2>&1; then
-		continue
-	fi
-
-	if [ ! -s "${GUEST_SSH_KNOWN_HOSTS}" ]; then
-		if ! ssh-keyscan "${GUEST_IP}" > "${GUEST_SSH_KNOWN_HOSTS}" 2> /dev/null; then
-			rm -f "${GUEST_SSH_KNOWN_HOSTS}"
-			continue
-		fi
-	fi
-
-	cat <<EOF > "${GUEST_SSH_CONFIG}"
-Host ${GUEST_NAME} ${GUEST_NAME}.${DL_DOMAIN} ${GUEST_IP}
-	Hostname ${GUEST_IP}
-	UserKnownHostsFile ~/.ssh/debops-lab/hosts/known_host.${GUEST_NAME}
-EOF
-
-	if ssh -F "${SSH_CONFIG}" "root@${GUEST_NAME}" hostname > /dev/null 2>&1; then
-		ONLINE=1
-		break
-	fi
-done
-
-if [ "$ONLINE" -ne 1 ]; then
-	echo "Failed to contact ${GUEST_NAME}" >&2
-	exit 1
-fi
-
-echo "Guest ${GUEST_NAME} online and accepting SSH connections"
+start_vm "boot" "253" "${BOOT_ARGS[@]}"
 
 info ""
 exit 0
