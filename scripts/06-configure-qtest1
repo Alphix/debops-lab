@@ -23,6 +23,7 @@ debops run service/slapd -l "${GUEST_NAME}"
 debops run ldap/init-directory -e="admin_use_password_store=False" < /dev/null
 debops run service/kerberos_server -l "${GUEST_NAME}"
 debops run kerberos/init-kerberos-admin -l "${GUEST_NAME}"
+# FIXME: the krb5.conf will contain a hostname which is internal to the qemu network
 export KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
 debops run bootstrap-sss -l "${GUEST_NAME}"
 debops run bootstrap-kerberos -l "${GUEST_NAME}"
