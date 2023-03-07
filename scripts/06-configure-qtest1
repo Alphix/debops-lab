@@ -1,0 +1,42 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+cd "${0%/*}"
+. ./functions.sh
+
+info "######################################"
+info "# LDAP/KERBEROS SERVER CONFIGURATION #"
+info "######################################"
+
+GUEST_NAME="qtest1"
+
+activate_python_virtualenv
+
+cd "./project"
+
+export ANSIBLE_STRATEGY=mitogen_linear
+
+debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
+# Instead of common, is pki enough?
+debops run common -l "${GUEST_NAME}"
+debops run service/slapd -l "${GUEST_NAME}"
+debops run ldap/init-directory -e="admin_use_password_store=False" < /dev/null
+debops run service/kerberos_server -l "${GUEST_NAME}"
+debops run kerberos/init-kerberos-admin -l "${GUEST_NAME}"
+export KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
+debops run bootstrap-sss -l "${GUEST_NAME}"
+debops run bootstrap-kerberos -l "${GUEST_NAME}"
+# Run again to to create a ldap host principal and keytab for slapd
+debops run service/slapd -l "${GUEST_NAME}"
+ssh -F ~/.ssh/debops-lab/ssh_config root@qtest1 systemctl restart slapd
+
+debops run bootstrap-sss -l qtest2 -e ansible_user=root
+debops run bootstrap-kerberos -l qtest2
+
+debops run bootstrap-sss -l qtest3 -e ansible_user=root
+debops run bootstrap-kerberos -l qtest3
+
+info "Host ${GUEST_NAME} configured"
+
+info ""
+exit 0

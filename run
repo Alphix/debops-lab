@@ -12,4 +12,6 @@ set -Eeuo pipefail
 ./scripts/02-prepare-files
 ./scripts/03-launch-boot-server
 ./scripts/04-configure-boot-server
+./scripts/05-launch-qtest-server
+./scripts/06-configure-qtest1
 
