@@ -54,7 +54,7 @@ function start_vm {
 	local GUEST_IP="192.168.99.${GUEST_ID}"
 	local GUEST_MAC="$(printf "52:54:00:00:00:%02x" "${GUEST_ID}")"
 	local GUEST_NETDEV="tap${GUEST_ID}"
-	local QEMU_IMG="./data/${GUEST_NAME}.img"
+	local QEMU_IMG="./tmp/vm-disks/${GUEST_NAME}.img"
 	local QEMU_EXTRA_OPTS="-name ${GUEST_NAME}"
 	QEMU_EXTRA_OPTS+=" -drive file=${QEMU_IMG},format=qcow2,cache=unsafe,if=virtio,aio=io_uring"
 	QEMU_EXTRA_OPTS+=" -device virtio-net,netdev=network0,mac=${GUEST_MAC}"
@@ -67,8 +67,8 @@ function start_vm {
 		mkdir -p "tmp/ssh/hosts"
 	fi
 
-	if [ ! -d "data" ]; then
-		mkdir "data"
+	if [ ! -d "tmp/vm-disks" ]; then
+		mkdir -p "tmp/vm-disks"
 	fi
 
 	if [ ! -e "${QEMU_IMG}" ]; then

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ ! -z "${VIRTUAL_ENV}" ]; then
+	echo "Virtual environment already active"
+	exit 0
+fi
+
+if [ ! -e "tmp/python-virtualenv/bin/activate" ]; then
+	echo "Virtual environment not found" >&2
+	exit 1
+fi
+
+source ./tmp/python-virtualenv/bin/activate

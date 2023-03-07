@@ -1,0 +1,11 @@
+kerberos__realm_txt_rr: ''
+kerberos__realm: 'EXAMPLE.COM'
+
+kerberos__kdcs: [ 'qtest1.example.com' ]
+
+kerberos__master_kdc: 'qtest1.example.com'
+
+kerberos__kpasswd_server: 'qtest1.example.com'
+
+kerberos__admin_server: 'qtest1.example.com'
+

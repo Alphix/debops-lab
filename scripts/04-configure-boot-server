@@ -19,7 +19,7 @@ if [ ! -e "project" ]; then
 	cp "../files/debops.cfg.template" "./.debops.cfg"
 	echo "ssh_args = -F \"${HOME}/.ssh/debops-lab/ssh_config\"" >> "./.debops.cfg"
 	rm -rf "./ansible/inventory"
-	ln -sf "../../files/inventory" "./ansible/inventory"
+	cp -a "../files/inventory" "./ansible/inventory"
 
 	if [ ! -z "${DL_CUSTOM_DEBOPS_REPO}" ]; then
 		git clone --quiet "${DL_CUSTOM_DEBOPS_REPO}" debops

@@ -1,0 +1,10 @@
+ldap__servers: [ 'qtest1.example.com' ]
+
+ldap__admin_delegate_to: 'qtest1'
+
+#ldap__admin_server_uri: 'ldapi:///'
+
+slapd__allow: [ '192.168.99.0/24' ]
+
+ldap__device_separate_domains: False
+
