@@ -1,0 +1,6 @@
+nfs_server__allow: [ '192.168.99.0/24' ]
+
+nfs_server__threads: 2
+
+#nfs_server__kerberos: True
+

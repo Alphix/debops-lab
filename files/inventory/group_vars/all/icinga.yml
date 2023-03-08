@@ -1,0 +1,9 @@
+icinga__master_nodes:
+  - target: 'qtest1.example.com'
+    port: '5665'
+
+icinga__director_nodes:
+  - target: 'qtest1.example.com'
+    port: '443'
+
+icinga_web__fqdn: 'qtest1.example.com'

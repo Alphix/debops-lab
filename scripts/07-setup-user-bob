@@ -63,7 +63,6 @@ export LDAPRC="${LDAP_CONF}"
 info "List of current inetOrgPerson entries in LDAP:"
 ldapsearch -Z -x -LLL -y "${LDAP_ADMIN_PWD_FILE}" "(objectClass=inetOrgPerson)" "dn"
 
-if false; then
 info "Reserving UID for new user"
 ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" <<EOF
 dn: cn=Next POSIX UID,ou=System,dc=example,dc=com
@@ -129,9 +128,11 @@ info "Adding a relaxed Kerberos pwd policy for testing purposes"
 kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_PRINC}"			\
 	addpol -minlength 1 -minclasses 1 testing
 
+# Wrt -pwexpire, see https://github.com/SSSD/sssd/issues/6612
 info "Adding a kerberos principal for user ${NEW_USER_NAME}"
 kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_PRINC}"			\
 	addprinc -policy testing -pw 123abc				\
+	-pwexpire "2030-01-01"						\
 	+requires_preauth +lockdown_keys				\
 	-x "dn=${NEW_USER_DN}"						\
 	"${NEW_USER_NAME}"

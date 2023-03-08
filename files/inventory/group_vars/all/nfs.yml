@@ -1,0 +1,4 @@
+nfs__shares:
+  - path: '/mnt/nfs'
+    src: 'qtest1.example.com:/'
+    

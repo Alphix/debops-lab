@@ -1,0 +1,4 @@
+postgresql_server__listen_addresses: [ 'localhost', '192.168.99.1' ]
+
+postgresql_server__allow: [ '192.168.99.0/24' ]
+
