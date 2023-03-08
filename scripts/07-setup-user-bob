@@ -1,0 +1,142 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+cd "${0%/*}"
+. ./functions.sh
+
+info "#########################"
+info "# SETUP TEST USER (BOB) #"
+info "#########################"
+
+NEW_USER_NAME="bob"
+NEW_USER_DN="uid=bob,ou=People,dc=example,dc=com"
+LDAP_ADMIN_DN="uid=${USER},ou=People,dc=example,dc=com"
+LDAP_ADMIN_PWD_FILE="$(pwd)/tmp/ldap_admin.pwd"
+LDAP_CONF="$(pwd)/tmp/ldap.conf"
+
+export ANSIBLE_STRATEGY=mitogen_linear
+
+activate_python_virtualenv
+
+cd "./project"
+if [ ! -e "${LDAP_ADMIN_PWD_FILE}" ]; then
+	info "Trying to determine LDAP admin password"
+
+	# Fetch and store a copy of the LDAP admin password in a convenient
+	# location. This is *not* how you'd do things in a production
+	# environment, but for demonstration purposes.
+	ADMIN_UUID="$(debops run ldap/get-uuid -e "object_dn=${LDAP_ADMIN_DN}" -l qtest1 2>&1 | grep "UUID:" | sed 's/.*:\s*\([^\s]*\).*/\1/')"
+	if [ ! -e "./ansible/secret/ldap/credentials/${ADMIN_UUID}.password" ]; then
+		die "Unable to find admin LDAP password, looked for ${ADMIN_UUID}.password"
+	fi
+
+	# This stores a copy of the password without a trailing newline, for use by the ldap* tools
+	echo -n "$(cat "./ansible/secret/ldap/credentials/${ADMIN_UUID}.password")" >> "${LDAP_ADMIN_PWD_FILE}"
+
+	# ldap tools like to complain about insecure file permissions (rightfully so)
+	chmod 0400 "${LDAP_ADMIN_PWD_FILE}"
+
+	info "LDAP admin password stored in ${LDAP_ADMIN_PWD_FILE}"
+fi
+
+if [ ! -e "${LDAP_CONF}" ]; then
+	cat <<EOF > "${LDAP_CONF}"
+#
+# LDAP Defaults
+#
+
+# See ldap.conf(5) for details
+# Note that these settings are *UNSAFE* and only suitable for testing purposes
+
+BASE		dc=example,dc=com
+URI		ldap://192.168.99.1/
+
+# This allows invalid certs to be accepted (bad idea)
+TLS_REQCERT	allow
+
+BINDDN		${LDAP_ADMIN_DN}
+EOF
+fi
+
+export LDAPRC="${LDAP_CONF}"
+
+info "List of current inetOrgPerson entries in LDAP:"
+ldapsearch -Z -x -LLL -y "${LDAP_ADMIN_PWD_FILE}" "(objectClass=inetOrgPerson)" "dn"
+
+if false; then
+info "Reserving UID for new user"
+ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" <<EOF
+dn: cn=Next POSIX UID,ou=System,dc=example,dc=com
+changetype: modify
+delete: uidNumber
+uidNumber: 2002000001
+-
+add: uidNumber
+uidNumber: 2002000002
+EOF
+
+info "Adding new user ${NEW_USER_NAME}"
+ldapadd -Z -x -y "${LDAP_ADMIN_PWD_FILE}" <<EOF
+dn: ${NEW_USER_DN}
+uid: bob
+gid: bob
+uidNumber: 2002000001
+gidNumber: 2002000001
+cn: Bob Smith
+sn: Smith
+givenName: Bob
+homeDirectory: /home/bob
+loginShell: /bin/bash
+authorizedService: all
+host: posix:all
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+objectClass: posixGroup
+objectClass: posixGroupId
+objectClass: ldapPublicKey
+objectClass: authorizedServiceObject
+objectClass: hostObject
+objectClass: mailRecipient
+mail: bob@example.com
+mailAddress: bob@example.com
+EOF
+
+info "Adding a SSH key for user ${NEW_USER_NAME}"
+ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" <<EOF
+dn: ${NEW_USER_DN}
+changeType: modify
+add: sshPublicKey
+sshPublicKey: $(cat ../tmp/ssh/id_ed25519.pub)
+EOF
+
+info "Making user ${NEW_USER_NAME} a member of the UNIX SSH users group"
+ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" <<EOF
+dn: cn=UNIX SSH users,ou=Groups,dc=example,dc=com
+changeType: modify
+add: member
+member: ${NEW_USER_DN}
+EOF
+
+info "List of inetOrgPerson entries in LDAP after changes:"
+ldapsearch -Z -x -LLL -y "${LDAP_ADMIN_PWD_FILE}" "(objectClass=inetOrgPerson)" "dn"
+
+export KRB5_CONFIG="./ansible/secret/kerberos/krb5.conf"
+KRB5_KEYTAB="./ansible/secret/kerberos/admin.keytab"
+KRB5_PRINC="${USER}/admin@EXAMPLE.COM"
+
+info "Adding a relaxed Kerberos pwd policy for testing purposes"
+kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_PRINC}"			\
+	addpol -minlength 1 -minclasses 1 testing
+
+info "Adding a kerberos principal for user ${NEW_USER_NAME}"
+kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_PRINC}"			\
+	addprinc -policy testing -pw 123abc				\
+	+requires_preauth +lockdown_keys				\
+	-x "dn=${NEW_USER_DN}"						\
+	"${NEW_USER_NAME}"
+
+info "New user ${NEW_USER_NAME} configured"
+
+info ""
+exit 0
