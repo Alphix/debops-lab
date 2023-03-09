@@ -1,13 +1,32 @@
 #!/bin/bash
 
-if [ ! -z "${VIRTUAL_ENV}" ]; then
-	echo "Virtual environment already active"
-	exit 0
-fi
-
-if [ ! -e "tmp/python-virtualenv/bin/activate" ]; then
-	echo "Virtual environment not found" >&2
+# Detect if the script is being sourced
+if ! (return 0 2>/dev/null); then
+	echo "The script must be sourced"
 	exit 1
 fi
 
+if [ ! -z "${VIRTUAL_ENV}" ]; then
+	echo "Virtual environment already active"
+	return 0
+fi
+
+SCRIPT_DIR="$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)"
+
+if ! pushd "${SCRIPT_DIR}" > /dev/null; then
+	echo "Failed to chdir to script dir"
+	return 1
+fi
+
+if [ ! -e "./tmp/python-virtualenv/bin/activate" ]; then
+	echo "Virtual environment not found" >&2
+	popd > /dev/null 2>&1
+	return 1
+fi
+
 source ./tmp/python-virtualenv/bin/activate
+export KRB5_CONFIG="$(pwd)/project/ansible/secret/kerberos/krb5.conf"
+export LDAPRC="$(pwd)/tmp/ldap.conf"
+export ANSIBLE_STRATEGY="mitogen_linear"
+
+popd > /dev/null
