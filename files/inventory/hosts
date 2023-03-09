@@ -102,7 +102,12 @@ qtest3
 qtest2
 
 [debops_service_postgresql_server]
+qtest2
+
+[debops_service_postgresql]
 qtest1
+qtest2
+qtest3
 
 [debops_service_icinga_db]
 qtest1

@@ -7,3 +7,8 @@ icinga__director_nodes:
     port: '443'
 
 icinga_web__fqdn: 'qtest1.example.com'
+
+icinga_db__type: 'postgresql'
+
+postgresql__server: 'qtest2.example.com'
+
