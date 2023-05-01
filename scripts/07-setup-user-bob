@@ -13,6 +13,7 @@ NEW_USER_DN="uid=bob,ou=People,dc=example,dc=com"
 LDAP_ADMIN_DN="uid=${USER},ou=People,dc=example,dc=com"
 LDAP_ADMIN_PWD_FILE="$(pwd)/tmp/ldap_admin.pwd"
 LDAP_CONF="$(pwd)/tmp/ldap.conf"
+CUSTOM_HOSTS="$(pwd)/hosts"
 
 export ANSIBLE_STRATEGY=mitogen_linear
 
@@ -123,6 +124,7 @@ ldapsearch -Z -x -LLL -y "${LDAP_ADMIN_PWD_FILE}" "(objectClass=inetOrgPerson)" 
 export KRB5_CONFIG="./ansible/secret/kerberos/krb5.conf"
 KRB5_KEYTAB="./ansible/secret/kerberos/admin.keytab"
 KRB5_PRINC="${USER}/admin@EXAMPLE.COM"
+export HOSTALIASES="${CUSTOM_HOSTS}"
 
 info "Adding a relaxed Kerberos pwd policy for testing purposes"
 kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_PRINC}"			\

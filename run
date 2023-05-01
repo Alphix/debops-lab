@@ -14,4 +14,5 @@ set -Eeuo pipefail
 ./scripts/04-configure-boot-server
 ./scripts/05-launch-qtest-server
 ./scripts/06-configure-qtest1
-
+./scripts/07-setup-user-bob
+./scripts/08-setup-icinga

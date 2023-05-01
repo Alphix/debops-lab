@@ -1,0 +1,5 @@
+192.168.99.1	qtest1.example.com qtest1
+192.168.99.2	qtest2.example.com qtest2
+192.168.99.3	qtest3.example.com qtest3
+192.168.99.253	boot.example.com boot
+192.168.99.254  router.example.com router

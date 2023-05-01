@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+cd "${0%/*}"
+. ./functions.sh
+
+info "########################"
+info "# ICINGA CONFIGURATION #"
+info "########################"
+
+activate_python_virtualenv
+
+export LDAPRC="$(pwd)/tmp/ldap.conf"
+
+cd "./project"
+
+export ANSIBLE_STRATEGY=mitogen_linear
+export KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
+
+#debops run service/postgresql_server -l qtest1
+#debops run service/postgresql
+debops run service/mariadb_server -l qtest1
+debops run service/mariadb
+debops run service/icinga -l qtest1
+debops run service/icinga_db -l qtest1
+debops run service/icinga_web -l qtest1
+# Run on all, including qtest1, so also qtest1 registers with the director
+debops run service/icinga
+
+info "Icinga configured"
+info "Login: root"
+info "Pass : $(cat ansible/secret/icinga_web/auth/qtest1/credentials/root/password)"
+
+info ""
+exit 0
