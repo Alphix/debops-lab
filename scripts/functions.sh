@@ -6,17 +6,75 @@ function read_config {
 	fi
 }
 
+if [ -z "${NO_COLOR:-}" ]; then
+	# Colors, NC = no color / text reset
+	NC='\033[0m'
+	BLACK='\033[0;30m'
+	RED='\033[0;31m'
+	GREEN='\033[0;32m'
+	YELLOW='\033[0;33m'
+	BLUE='\033[0;34m'
+	PURPLE='\033[0;35m'
+	CYAN='\033[0;36m'
+	WHITE='\033[0;37m'
+	GREY='\033[2;37m'
+else
+	NC=''
+	BLACK=''
+	RED=''
+	GREEN=''
+	YELLOW=''
+	BLUE=''
+	PURPLE=''
+	CYAN=''
+	WHITE=''
+	GREY=''
+fi
+
+function print_header {
+	local TITLE="### ${1} ###"
+	local LEN="${#TITLE}"
+	local BAR="$(printf '#%.0s' $(seq 1 ${LEN}))"
+
+	printf '%b%s%b\n' "${GREY}" "${BAR}" "${NC}"
+	printf '%b%s%b\n' "${GREY}" "${TITLE}" "${NC}"
+	printf '%b%s%b\n' "${GREY}" "${BAR}" "${NC}"
+	printf '\n'
+}
+
+function print_ok {
+	printf '%b✔%b %s\n' "${GREEN}" "${NC}" "$*"
+}
+	
+function print_changed {
+	printf '%b⚙%b\n' "${YELLOW}" "${NC}" "$*"
+}
+
+function print_error {
+	printf '%b✘%b %s\n' "${RED}" "${NC}" "$*"
+}
+
+function print_info {
+	printf 'ⓘ %s\n' "$*"
+}
+
+function print_newline {
+	printf '\n'
+}
+
+function die {
+	printf '%b☠%b %s\n' "${RED}" "${NC}" "$*"
+	exit 1
+}
+
+# FIXME: Remove
 function info {
 	printf '%s\n' "$*"
 }
 
+# FIXME: Remove
 function error {
 	printf '%s\n' "$*" >&2
-}
-
-function die {
-	printf '%s\n' "$*" >&2
-	exit 1
 }
 
 function activate_python_virtualenv {

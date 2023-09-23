@@ -4,77 +4,106 @@ set -Eeuo pipefail
 cd "${0%/*}"
 . ./functions.sh
 
-info "####################"
-info "# NETWORKING SETUP #"
-info "####################"
+print_header "NETWORKING SETUP"
+
+if [ -z "${DL_BRIDGE_NAME:-}" ]; then
+	die "DL_BRIDGE_NAME is not set"
+elif [ -z "${DL_BRIDGE_ADDRESS:-}" ]; then
+	die "DL_BRIDGE_ADDRESS is not set"
+elif [ -z "${DL_BRIDGE_PREFIX:-}" ]; then
+	die "DL_BRIDGE_PREFIX is not set"
+elif [ -z "${DL_BRIDGE_PREFIX_LEN:-}" ]; then
+	die "DL_BRIDGE_PREFIX_LEN is not set"
+fi
+
+DL_BRIDGE_CIDR="${DL_BRIDGE_ADDRESS}/${DL_BRIDGE_PREFIX_LEN}"
+DL_BRIDGE_NET_CIDR="${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"
 
 if ! ip link show "${DL_BRIDGE_NAME}" > /dev/null 2>&1; then
-	info "Creating bridge device ${DL_BRIDGE_NAME}"
+	print_changed "Creating bridge device ${DL_BRIDGE_NAME}"
 	sudo ip link add "${DL_BRIDGE_NAME}" type bridge
 else
-	info "Bridge device ${DL_BRIDGE_NAME} already exists"
+	print_ok "Bridge device ${DL_BRIDGE_NAME} already exists"
 fi
 
-info "Setting address on bridge device ${DL_BRIDGE_NAME} to ${DL_BRIDGE_ADDRESS}/${DL_BRIDGE_PREFIX_LEN}"
-sudo ip addr add "${DL_BRIDGE_ADDRESS}/${DL_BRIDGE_PREFIX_LEN}" dev "${DL_BRIDGE_NAME}" > /dev/null 2>&1 || true
+if ! ip -4 -o addr show "${DL_BRIDGE_NAME}" | awk '{print $4}' | \
+	grep -q "^${DL_BRIDGE_CIDR}$"; then
+	print_changed "Setting address on bridge device ${DL_BRIDGE_NAME} to ${DL_BRIDGE_CIDR}"
+	sudo ip addr add "${DL_BRIDGE_CIDR}" dev "${DL_BRIDGE_NAME}" > /dev/null 2>&1 || true
+else
+	print_ok "Bridge device ${DL_BRIDGE_NAME} already has address ${DL_BRIDGE_CIDR}"
+fi
 
-info "Bringing up bridge device ${DL_BRIDGE_NAME}"
-sudo ip link set "${DL_BRIDGE_NAME}" up qlen 10000
+# shellcheck disable=SC1003
+if [ "$(ip -o link show "${DL_BRIDGE_NAME}" | cut -d'\' -f1 | \
+	awk '{for (i=4; i<=NF; i+=2) print $i, $(i+1)}' | \
+	sed -e '/^state UP$/p;/^qlen 10000$/p;d' | wc -l)" != "2" ]; then
+	print_changed "Bringing up bridge device ${DL_BRIDGE_NAME}"
+	sudo ip link set "${DL_BRIDGE_NAME}" up qlen 10000
+else
+	print_ok "Bridge device ${DL_BRIDGE_NAME} is already up"
+fi
 
-if ! sudo iptables -t nat -C POSTROUTING			\
-	  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-	! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-	  -m comment --comment="debops-lab"			\
+if ! sudo iptables -t nat -C POSTROUTING		\
+	  -s "${DL_BRIDGE_NET_CIDR}"			\
+	! -d "${DL_BRIDGE_NET_CIDR}"			\
+	  -m comment --comment="debops-lab"		\
 	  -j MASQUERADE > /dev/null 2>&1; then
-	info "Adding firewall masquerade rule for bridge network egress"
-	sudo iptables -t nat -A POSTROUTING				\
-		  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-		! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-		  -m comment --comment="debops-lab"			\
+	print_changed "Adding firewall masquerade rule for bridge network egress"
+	sudo iptables -t nat -A POSTROUTING		\
+		  -s "${DL_BRIDGE_NET_CIDR}"		\
+		! -d "${DL_BRIDGE_NET_CIDR}"		\
+		  -m comment --comment="debops-lab"	\
 		  -j MASQUERADE
 else
-	info "Firewall masquerade rule for bridge network egress already exists"
+	print_ok "Firewall masquerade rule for bridge network egress already exists"
 fi
 
-if ! sudo iptables -t filter -C FORWARD				\
-	  -i "${DL_BRIDGE_NAME}"				\
-	! -o "${DL_BRIDGE_NAME}"				\
-	  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-	! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-	  -m comment --comment="debops-lab"			\
+if ! sudo iptables -t filter -C FORWARD			\
+	  -i "${DL_BRIDGE_NAME}"			\
+	! -o "${DL_BRIDGE_NAME}"			\
+	  -s "${DL_BRIDGE_NET_CIDR}"			\
+	! -d "${DL_BRIDGE_NET_CIDR}"			\
+	  -m comment --comment="debops-lab"		\
 	  -j ACCEPT > /dev/null 2>&1; then
-	info "Adding firewall forwarding rule for bridge network egress"
-	sudo iptables -t filter -I FORWARD 1				\
-		  -i "${DL_BRIDGE_NAME}"				\
-		! -o "${DL_BRIDGE_NAME}"				\
-		  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-		! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
-		  -m comment --comment="debops-lab"			\
+	print_changed "Adding firewall forwarding rule for bridge network egress"
+	sudo iptables -t filter -I FORWARD 1		\
+		  -i "${DL_BRIDGE_NAME}"		\
+		! -o "${DL_BRIDGE_NAME}"		\
+		  -s "${DL_BRIDGE_NET_CIDR}"		\
+		! -d "${DL_BRIDGE_NET_CIDR}"		\
+		  -m comment --comment="debops-lab"	\
 		  -j ACCEPT
 else
-	info "Firewall forwarding rule for bridge network egress already exists"
+	print_ok "Firewall forwarding rule for bridge network egress already exists"
 fi
 
 function add_tap {
 	local TAPDEV="${1}"
 
 	if ! ip link show "${TAPDEV}" > /dev/null 2>&1; then
-		info "Adding network device ${TAPDEV}"
+		print_changed "Adding network device ${TAPDEV}"
 		sudo ip tuntap add dev "${TAPDEV}" mode tap user "${USER}"
 	else
-		info "Network device ${1} already exists"
+		print_ok "Network device ${TAPDEV} already exists"
 	fi
 	sudo ip link set "${TAPDEV}" master "${DL_BRIDGE_NAME}"
 	sudo ip link set "${TAPDEV}" up qlen 10000
 }
 
-add_tap tap253
 add_tap tap1
 add_tap tap2
 add_tap tap3
+add_tap tap253
 
-info "Setting up IPv4 forwarding"
-sudo sh -c 'echo 1 >> /proc/sys/net/ipv4/ip_forward'
+if [ ! -r "/proc/sys/net/ipv4/ip_forward" ]; then
+	die "Can't find cat /proc/sys/net/ipv4/ip_forward"
+elif [ "$(cat /proc/sys/net/ipv4/ip_forward)" = "1" ]; then
+	print_ok "IPv4 forwarding already enabled"
+else
+	print_changed "Enabling IPv4 forwarding"
+	sudo sh -c 'echo 1 >> /proc/sys/net/ipv4/ip_forward'
+fi
 
-info ""
+print_newline
 exit 0
