@@ -6,6 +6,7 @@ function read_config {
 	fi
 }
 
+
 if [ -z "${NO_COLOR:-}" ]; then
 	# Colors, NC = no color / text reset
 	NC='\033[0m'
@@ -31,6 +32,7 @@ else
 	GREY=''
 fi
 
+
 function print_header {
 	local TITLE="### ${1} ###"
 	local LEN="${#TITLE}"
@@ -42,40 +44,49 @@ function print_header {
 	printf '\n'
 }
 
+
 function print_ok {
 	printf '%b✔%b %s\n' "${GREEN}" "${NC}" "$*"
 }
-	
+
+
 function print_changed {
 	printf '%b⚙%b %s\n' "${YELLOW}" "${NC}" "$*"
 }
+
 
 function print_error {
 	printf '%b✘%b %s\n' "${RED}" "${NC}" "$*"
 }
 
+
 function print_info {
 	printf '%bℹ%b %s\n' "${BLUE}" "${NC}" "$*"
 }
 
+
 function print_newline {
 	printf '\n'
 }
+
 
 function die {
 	printf '%b☠%b %s\n' "${RED}" "${NC}" "$*"
 	exit 1
 }
 
+
 # FIXME: Remove
 function info {
 	printf '%s\n' "$*"
 }
 
+
 # FIXME: Remove
 function error {
 	printf '%s\n' "$*" >&2
 }
+
 
 function activate_python_virtualenv {
 	#sudo apt install build-essential python3-virtualenv virtualenv python3-dev \
@@ -85,14 +96,74 @@ function activate_python_virtualenv {
 	fi
 
 	if [ ! -e "./tmp/python-virtualenv" ]; then
-		info "Creating python virtual environment"
+		print_changed "Creating python virtual environment in tmp/python-virtualenv"
 		virtualenv "./tmp/python-virtualenv" > /dev/null 2>&1
 	fi
 
 	source "./tmp/python-virtualenv/bin/activate"
-	info "Making sure DebOps and ansible are installed in the virtual environment"
-	pip3 install debops[ansible] > /dev/null 2>&1
+
+	if pip3 show -qqq debops && pip3 show -qqq ansible; then
+		print_ok "DebOps and Ansible are installed in the virtual environment"
+	else
+		print_changed "Installing DebOps and Ansible in the virtual environment"
+		pip3 install debops[ansible] > /dev/null 2>&1
+	fi
+
+	if pip3 show -qqq mitogen; then
+		print_ok "Mitogen is installed in the virtual environment"
+	else
+		print_changed "Installing Mitogen in the virtual environment"
+		pip3 install mitogen > /dev/null 2>&1
+
+		# This is lame, but mitogen hardcodes Ansible versions and is
+		# slow to react to new releases, see e.g.:
+		#   - https://github.com/mitogen-hq/mitogen/issues/974
+		#   - https://github.com/mitogen-hq/mitogen/issues/1021
+		print_changed "Bumping the max supported Ansible version for Mitogen"
+		sed -i 's/^ANSIBLE_VERSION_MAX\s*=.*/ANSIBLE_VERSION_MAX = (2, 99)/' \
+			./tmp/python-virtualenv/lib/*/site-packages/ansible_mitogen/loaders.py
+	fi
 }
+
+
+# This can be called as:
+# run_playbook <playbook> [<host|group>] [<extra_args>]
+function run_playbook {
+	if [ "$#" -lt 1 ]; then
+		die "Invalid number of arguments to function run_playbook()"
+	fi
+
+	if [ -z "${VIRTUAL_ENV:-}" ]; then
+		die "Not running in a virtual environment!?"
+	fi
+
+	local PLAYBOOK="$1"
+	local ARGS=("${PLAYBOOK}")
+	shift
+
+	if [ "$#" -gt 0 ]; then
+		local HOST="$1"
+		ARGS+=("-l" "${HOST}")
+		shift
+	else
+		local HOST="all"
+	fi
+
+	ARGS+=("${@}")
+	local LOGFILE="logs/${HOST}-${PLAYBOOK}.log"
+
+	export ANSIBLE_STRATEGY=mitogen_linear
+
+	print_info "Running DebOps playbook ${PLAYBOOK} on ${HOST}"
+	print_info "Log file: project/${LOGFILE}"
+
+	if ! debops run "${ARGS[@]}" > "${LOGFILE}" 2>&1; then
+		die "DebOps run failed, review the log file for details"
+	else
+		print_ok "Done running DebOps playbook ${PLAYBOOK} on ${HOST}"
+	fi
+}
+
 
 function start_vm {
 	if [ "$#" -lt 2 ]; then
@@ -203,6 +274,7 @@ EOF
 
 	print_ok "Guest VM ${GUEST_NAME} online and accepting SSH connections"
 }
+
 
 read_config
 cd ".."
