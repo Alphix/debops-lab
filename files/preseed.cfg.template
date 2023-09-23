@@ -1,5 +1,5 @@
 d-i debian-installer/language string en
-d-i mirror/suite string bullseye
+d-i mirror/suite string bookworm
 d-i mirror/country string manual
 d-i mirror/http/directory string /debian
 d-i passwd/make-user boolean false
