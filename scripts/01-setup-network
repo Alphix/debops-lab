@@ -34,14 +34,15 @@ else
 	print_ok "Bridge device ${DL_BRIDGE_NAME} already has address ${DL_BRIDGE_CIDR}"
 fi
 
+# Note: bringing up a bridge when none of the tap devices are in use is a noop
 # shellcheck disable=SC1003
 if [ "$(ip -o link show "${DL_BRIDGE_NAME}" | cut -d'\' -f1 | \
 	awk '{for (i=4; i<=NF; i+=2) print $i, $(i+1)}' | \
-	sed -e '/^state UP$/p;/^qlen 10000$/p;d' | wc -l)" != "2" ]; then
-	print_changed "Bringing up bridge device ${DL_BRIDGE_NAME}"
-	sudo ip link set "${DL_BRIDGE_NAME}" up qlen 10000
+	sed -e '/^qlen 10000$/p;d' | wc -l)" != "1" ]; then
+	print_changed "Setting queue length for bridge device ${DL_BRIDGE_NAME}"
+	sudo ip link set "${DL_BRIDGE_NAME}" qlen 10000
 else
-	print_ok "Bridge device ${DL_BRIDGE_NAME} is already up"
+	print_ok "Bridge device ${DL_BRIDGE_NAME} queue length is already set"
 fi
 
 if ! sudo iptables -t nat -C POSTROUTING		\
