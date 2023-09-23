@@ -4,88 +4,123 @@ set -Eeuo pipefail
 cd "${0%/*}"
 . ./functions.sh
 
-info "####################"
-info "# FILE PREPARATION #"
-info "####################"
+print_header "FILE PREPARATION"
 
 if [ ! -d "tmp" ]; then
+	print_changed "Creating directory tmp"
 	mkdir "tmp"
+else
+	print_ok "Directory tmp already exists"
 fi
-cd "tmp"
 
-if [ ! -d "ssh" ]; then
-	mkdir "ssh"
+if [ ! -d "tmp/ssh" ]; then
+	print_changed "Creating directory tmp/ssh"
+	mkdir "tmp/ssh"
+else
+	print_ok "Directory tmp/ssh already exists"
 fi
-cd "ssh"
 
-if [ ! -e "id_ed25519" ]; then
-	info "Generating a SSH key"
+if [ ! -d "tmp/ssh/hosts" ]; then
+	print_changed "Creating directory tmp/ssh/hosts"
+	mkdir "tmp/ssh/hosts"
+else
+	print_ok "Directory tmp/ssh/hosts already exists"
+fi
+
+if [ ! -e "tmp/ssh/id_ed25519" ]; then
+	print_changed "Generating SSH key tmp/ssh/id_ed25519"
 	ssh-keygen -t ed25519 -f "id_ed25519" -C "debops-lab-${USER}" -N "" -q
+else
+	print_ok "SSH key tmp/ssh/id_ed25519 already exists"
 fi
 
-if [ ! -e "ssh_config" ]; then
-	info "Installing custom ssh_config"
-	cp "../../files/ssh_config" "./"
-fi
-
-if [ ! -d "hosts" ]; then
-	mkdir "hosts"
+if [ ! -e "tmp/ssh/ssh_config" ]; then
+	print_changed "Installing files/ssh_config to tmp/ssh/ssh_config"
+	cp "./files/ssh_config" "./tmp/ssh/"
+else
+	print_ok "Custom ssh_config already exists at tmp/ssh/ssh_config"
 fi
 
 if [ ! -e ~/.ssh ]; then
+	print_changed "Creating directory ~/.ssh"
 	mkdir --mode=0700 ~/.ssh
+else
+	print_ok "Directory ~/.ssh already exists"
 fi
 
 if [ ! -e ~/.ssh/debops-lab ]; then
-	ln -sf "${PWD}" ~/.ssh/debops-lab
+	print_changed "Linking ~/.ssh/debops-lab to tmp/ssh"
+	ln -sf "${PWD}/tmp/ssh" ~/.ssh/debops-lab
+else
+	print_ok "Link ~/.ssh/debops-lab already exists"
 fi
-
-cd ..
 
 function get_file {
-	local file="$1"
-	local uri="$2"
+	local FILE="${1}"
+	local ETAG="${FILE}.etag"
+	local URI="${2}"
 
-	if [ -e "${file}" ]; then
-		info "Checking for an updated ${file}"
-		zflag=(-z "${file}")
+	if [ -e "${FILE}" ] && [ -e "${ETAG}" ]; then
+		print_info "Checking for an updated version of ${FILE}"
+		print_info "URI: ${URI}"
+		local OLD_CHECKSUM="$(sha256sum "${FILE}")"
+		curl -s -o "${FILE}" --etag-compare "${ETAG}" --etag-save "${ETAG}" "${URI}"
+		local NEW_CHECKSUM="$(sha256sum "${FILE}")"
+		if [ "${OLD_CHECKSUM}" = "${NEW_CHECKSUM}" ]; then
+			print_ok "File ${FILE} is already current"
+		else
+			print_changed "File ${FILE} updated"
+		fi
 	else
-		info "Downloading file ${file}"
-		zflag=()
+		rm -f "${FILE}" "${ETAG}"
+		print_changed "Downloading file ${FILE} from ${URI}"
+		print_info "URI: ${URI}"
+		curl -s -o "${FILE}" --etag-compare "${ETAG}" --etag-save "${ETAG}" "${URI}"
 	fi
-	curl -s -o "${file}" "${zflag[@]}" "$uri"
+
+	if [ ! -e "${FILE}" ]; then
+		print_info "PWD is $PWD"
+		die "File ${FILE} not found"
+	fi
 }
 
-get_file "initrd.gz" "${DL_INITRD_URL}"
-get_file "linux" "${DL_KERNEL_URL}"
+get_file "tmp/initrd.gz" "${DL_INITRD_URL}"
+get_file "tmp/linux" "${DL_KERNEL_URL}"
 
-if [ ! -e "../files/preseed.cfg.template" ]; then
-	info "Preseed template file missing"
-	exit 1
-elif [ ! -e "preseed.cfg" ] || [ "../files/preseed.cfg.template" -nt "preseed.cfg" ]; then
-	cp "../files/preseed.cfg.template" preseed.cfg
-	echo "d-i passwd/root-password password ${DL_DI_ROOT_PW}" >> preseed.cfg
-	echo "d-i passwd/root-password-again password ${DL_DI_ROOT_PW}" >> preseed.cfg
-	echo "d-i debian-installer/country string ${DL_DI_COUNTRY}" >> preseed.cfg
-	echo "d-i debian-installer/locale string ${DL_DI_LOCALE}" >> preseed.cfg
-	echo "d-i keyboard-configuration/xkb-keymap select ${DL_DI_KEYMAP}" >> preseed.cfg
-	echo "d-i mirror/http/hostname string ${DL_DI_MIRROR}" >> preseed.cfg
+if [ ! -e "./files/preseed.cfg.template" ]; then
+	die "Preseed template file files/preseed.cfg.template missing"
+elif [ ! -e "./tmp/preseed.cfg" ] || [ "./files/preseed.cfg.template" -nt "./tmp/preseed.cfg" ]; then
+	print_changed "Generating preseed file tmp/preseed.cfg from template files/preseed.cfg.template"
+	cp "./files/preseed.cfg.template" "./tmp/preseed.cfg"
+	echo "d-i passwd/root-password password ${DL_DI_ROOT_PW}" >> ./tmp/preseed.cfg
+	echo "d-i passwd/root-password-again password ${DL_DI_ROOT_PW}" >> ./tmp/preseed.cfg
+	echo "d-i debian-installer/country string ${DL_DI_COUNTRY}" >> ./tmp/preseed.cfg
+	echo "d-i debian-installer/locale string ${DL_DI_LOCALE}" >> ./tmp/preseed.cfg
+	echo "d-i keyboard-configuration/xkb-keymap select ${DL_DI_KEYMAP}" >> ./tmp/preseed.cfg
+	echo "d-i mirror/http/hostname string ${DL_DI_MIRROR}" >> ./tmp/preseed.cfg
 	if [ ! -z "${DL_DI_PROXY}" ]; then
-		echo "d-i mirror/http/proxy string ${DL_DI_PROXY}" >> preseed.cfg
+		echo "d-i mirror/http/proxy string ${DL_DI_PROXY}" >> ./tmp/preseed.cfg
 	fi
-	echo "d-i time/zone string ${DL_DI_TZ}" >> preseed.cfg
-	echo "d-i preseed/late_command string in-target sh -c \"mkdir -m 700 /root/.ssh; echo '$(cat ~/.ssh/debops-lab/*.pub)' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys\"" >> preseed.cfg
+	echo "d-i time/zone string ${DL_DI_TZ}" >> ./tmp/preseed.cfg
+	echo "d-i preseed/late_command string in-target sh -c \"mkdir -m 700 /root/.ssh; echo '$(cat ~/.ssh/debops-lab/*.pub)' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys\"" >> ./tmp/preseed.cfg
+else
+	print_ok "Preseed file tmp/preseed.cfg is up to date"
 fi
 
-if [ ! -e "initrd-mod.gz" ] || [ "preseed.cfg" -nt "initrd-mod.gz" ] || [ "initrd.gz" -nt "initrd-mod.gz" ]; then
-	info "Creating updated initrd including preseed.cfg"
+if [ ! -e "./tmp/initrd-mod.gz" ] || \
+   [ "./tmp/preseed.cfg" -nt "./tmp/initrd-mod.gz" ] || \
+   [ "./tmp/initrd.gz" -nt "./tmp/initrd-mod.gz" ]; then
+	print_changed "Creating updated preseeded initrd in tmp/initrd-mod.gz"
+	cd tmp
 	rm -f initrd-mod.gz
 	gunzip --keep initrd.gz
 	echo preseed.cfg | cpio -H newc -o -A -F initrd --quiet
 	mv initrd initrd-mod
 	gzip initrd-mod
+	cd ..
+else
+	print_ok "Preseeded initrd in tmp/initrd-mod.gz is up to date"
 fi
 
-
-info ""
+print_newline
 exit 0

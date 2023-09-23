@@ -47,7 +47,7 @@ function print_ok {
 }
 	
 function print_changed {
-	printf '%b⚙%b\n' "${YELLOW}" "${NC}" "$*"
+	printf '%b⚙%b %s\n' "${YELLOW}" "${NC}" "$*"
 }
 
 function print_error {
@@ -55,7 +55,7 @@ function print_error {
 }
 
 function print_info {
-	printf 'ⓘ %s\n' "$*"
+	printf '%bℹ%b %s\n' "${BLUE}" "${NC}" "$*"
 }
 
 function print_newline {
