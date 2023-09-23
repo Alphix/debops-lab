@@ -13,8 +13,6 @@ if ! ip link show "${DL_BRIDGE_NAME}" > /dev/null 2>&1; then
 	sudo ip link add "${DL_BRIDGE_NAME}" type bridge
 else
 	info "Bridge device ${DL_BRIDGE_NAME} already exists"
-	info ""
-	exit 0
 fi
 
 info "Setting address on bridge device ${DL_BRIDGE_NAME} to ${DL_BRIDGE_ADDRESS}/${DL_BRIDGE_PREFIX_LEN}"
@@ -34,13 +32,40 @@ if ! sudo iptables -t nat -C POSTROUTING			\
 		! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
 		  -m comment --comment="debops-lab"			\
 		  -j MASQUERADE
+else
+	info "Firewall masquerade rule for bridge network egress already exists"
+fi
+
+if ! sudo iptables -t filter -C FORWARD				\
+	  -i "${DL_BRIDGE_NAME}"				\
+	! -o "${DL_BRIDGE_NAME}"				\
+	  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+	! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+	  -m comment --comment="debops-lab"			\
+	  -j ACCEPT > /dev/null 2>&1; then
+	info "Adding firewall forwarding rule for bridge network egress"
+	sudo iptables -t filter -I FORWARD 1				\
+		  -i "${DL_BRIDGE_NAME}"				\
+		! -o "${DL_BRIDGE_NAME}"				\
+		  -s "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+		! -d "${DL_BRIDGE_PREFIX}/${DL_BRIDGE_PREFIX_LEN}"	\
+		  -m comment --comment="debops-lab"			\
+		  -j ACCEPT
+else
+	info "Firewall forwarding rule for bridge network egress already exists"
 fi
 
 function add_tap {
-	info "Adding network device $1"
-	sudo ip tuntap add dev "$1" mode tap user "$USER" || true
-	sudo ip link set "$1" master "${DL_BRIDGE_NAME}"
-	sudo ip link set "$1" up qlen 10000
+	local TAPDEV="${1}"
+
+	if ! ip link show "${TAPDEV}" > /dev/null 2>&1; then
+		info "Adding network device ${TAPDEV}"
+		sudo ip tuntap add dev "${TAPDEV}" mode tap user "${USER}"
+	else
+		info "Network device ${1} already exists"
+	fi
+	sudo ip link set "${TAPDEV}" master "${DL_BRIDGE_NAME}"
+	sudo ip link set "${TAPDEV}" up qlen 10000
 }
 
 add_tap tap253
