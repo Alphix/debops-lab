@@ -4,40 +4,46 @@ set -Eeuo pipefail
 cd "${0%/*}"
 . ./functions.sh
 
-info "######################################"
-info "# LDAP/KERBEROS SERVER CONFIGURATION #"
-info "######################################"
+print_header "LDAP/KERBEROS CONFIGURATION"
 
 GUEST_NAME="qtest1"
 
 activate_python_virtualenv
 
+# FIXME: this is lame...
 cd "./project"
 
-export ANSIBLE_STRATEGY=mitogen_linear
+run_playbook "bootstrap" "${GUEST_NAME}" -e ansible_user=root
 
-debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
 # Instead of common, is pki enough?
-debops run common -l "${GUEST_NAME}"
-debops run service/slapd -l "${GUEST_NAME}"
-debops run ldap/init-directory -e="admin_use_password_store=False" < /dev/null
-debops run service/kerberos_server -l "${GUEST_NAME}"
-debops run kerberos/init-kerberos-admin -l "${GUEST_NAME}"
+run_playbook "common" "${GUEST_NAME}"
+
+run_playbook "service/slapd" "${GUEST_NAME}"
+# The /dev/null part simulates non-interactive execution
+run_playbook "ldap/init-directory" "${GUEST_NAME}" -e admin_use_password_store=False < /dev/null
+
+run_playbook "service/kerberos_server" "${GUEST_NAME}"
+# The /dev/null part simulates non-interactive execution
+run_playbook "kerberos/init-kerberos-admin" "${GUEST_NAME}" < /dev/null
 # FIXME: the krb5.conf will contain a hostname which is internal to the qemu network
 export KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
-debops run bootstrap-sss -l "${GUEST_NAME}"
-debops run bootstrap-kerberos -l "${GUEST_NAME}"
+
+run_playbook "bootstrap-sss" "${GUEST_NAME}"
+
+run_playbook "bootstrap-kerberos" "${GUEST_NAME}"
+
 # Run again to to create a ldap host principal and keytab for slapd
-debops run service/slapd -l "${GUEST_NAME}"
-ssh -F ~/.ssh/debops-lab/ssh_config root@qtest1 systemctl restart slapd
+run_playbook "service/slapd" "${GUEST_NAME}"
 
-debops run bootstrap-sss -l qtest2 -e ansible_user=root
-debops run bootstrap-kerberos -l qtest2
+# FIXME: This shouldn't be necessary
+#ssh -F ~/.ssh/debops-lab/ssh_config root@qtest1 systemctl restart slapd
 
-debops run bootstrap-sss -l qtest3 -e ansible_user=root
-debops run bootstrap-kerberos -l qtest3
+run_playbook "bootstrap-sss" "qtest2" -e ansible_user=root
+run_playbook "bootstrap-kerberos" "qtest2"
 
-info "Host ${GUEST_NAME} configured"
+run_playbook "bootstrap-sss" "qtest3" -e ansible_user=root
+run_playbook "bootstrap-kerberos" "qtest3"
 
-info ""
+print_info "Additional VMs configured"
+print_newline
 exit 0
