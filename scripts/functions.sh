@@ -4,6 +4,12 @@ function read_config {
 	if [ -e ../custom.cfg ]; then
 		. ../custom.cfg
 	fi
+
+	if [ "${DL_USE_MITOGEN:-no}" = "yes" ]; then
+		DL_USE_MITOGEN=true
+	else
+		DL_USE_MITOGEN=false
+	fi
 }
 
 
@@ -72,6 +78,7 @@ function print_newline {
 
 function die {
 	printf '%b☠%b %s\n' "${RED}" "${NC}" "$*"
+	printf '\n'
 	exit 1
 }
 
@@ -109,19 +116,22 @@ function activate_python_virtualenv {
 		pip3 install debops[ansible] > /dev/null 2>&1
 	fi
 
-	if pip3 show -qqq mitogen; then
-		print_ok "Mitogen is installed in the virtual environment"
-	else
-		print_changed "Installing Mitogen in the virtual environment"
-		pip3 install mitogen > /dev/null 2>&1
+	if $DL_USE_MITOGEN; then
+		if pip3 show -qqq mitogen; then
+			print_ok "Mitogen is installed in the virtual environment"
+		else
+			print_changed "Installing Mitogen in the virtual environment"
+			pip3 install mitogen > /dev/null 2>&1
 
-		# This is lame, but mitogen hardcodes Ansible versions and is
-		# slow to react to new releases, see e.g.:
-		#   - https://github.com/mitogen-hq/mitogen/issues/974
-		#   - https://github.com/mitogen-hq/mitogen/issues/1021
-		print_changed "Bumping the max supported Ansible version for Mitogen"
-		sed -i 's/^ANSIBLE_VERSION_MAX\s*=.*/ANSIBLE_VERSION_MAX = (2, 99)/' \
-			./tmp/python-virtualenv/lib/*/site-packages/ansible_mitogen/loaders.py
+			# This is lame, but mitogen hardcodes Ansible versions and is
+			# slow to react to new releases, see e.g.:
+			#   - https://github.com/mitogen-hq/mitogen/issues/974
+			#   - https://github.com/mitogen-hq/mitogen/issues/1021
+			print_changed "Bumping the max supported Ansible version for Mitogen"
+			sed -i 's/^ANSIBLE_VERSION_MAX\s*=.*/ANSIBLE_VERSION_MAX = (2, 99)/' \
+				./tmp/python-virtualenv/lib/*/site-packages/ansible_mitogen/loaders.py
+			rm -rf ./tmp/python-virtualenv/lib/*/site-packages/ansible_mitogen/__pycache__
+		fi
 	fi
 }
 
@@ -138,6 +148,7 @@ function run_playbook {
 	fi
 
 	local PLAYBOOK="$1"
+	local PLAYBOOK_ESC="$(echo "${PLAYBOOK}" | tr "/" "_")"
 	local ARGS=("${PLAYBOOK}")
 	shift
 
@@ -150,17 +161,18 @@ function run_playbook {
 	fi
 
 	ARGS+=("${@}")
-	local LOGFILE="logs/${HOST}-${PLAYBOOK}.log"
+	local LOGFILE="logs/${HOST}-${PLAYBOOK_ESC}.log"
 
-	export ANSIBLE_STRATEGY=mitogen_linear
-
-	print_info "Running DebOps playbook ${PLAYBOOK} on ${HOST}"
-	print_info "Log file: project/${LOGFILE}"
-
-	if ! debops run "${ARGS[@]}" > "${LOGFILE}" 2>&1; then
-		die "DebOps run failed, review the log file for details"
+	if $DL_USE_MITOGEN; then
+		export ANSIBLE_STRATEGY=mitogen_linear
 	else
-		print_ok "Done running DebOps playbook ${PLAYBOOK} on ${HOST}"
+		unset ANSIBLE_STRATEGY
+	fi
+
+	print_changed "Running DebOps playbook ${PLAYBOOK} on ${HOST} (log: project/${LOGFILE})"
+
+	if ! debops run "${ARGS[@]}" >> "${LOGFILE}" 2>&1; then
+		die "DebOps run failed, review the log file for details"
 	fi
 }
 
@@ -259,7 +271,7 @@ EOF
 			print_ok "SSH config for VM ${GUEST_NAME} is up to date"
 		fi
 
-		print_info "Attempting to login via SSH as root to VM ${GUEST_NAME}"
+		print_info "Attempting to login as root via SSH to VM ${GUEST_NAME}"
 		if ssh -F "${SSH_CONFIG}" "root@${GUEST_NAME}" hostname > /dev/null 2>&1; then
 			ONLINE=1
 			break

@@ -30,13 +30,22 @@ retry_files_enabled = false
 stdout_callback = yaml
 
 # Define the list of the built-in callback plugins enabled by default.
-callback_whitelist = timer
+callbacks_enabled = timer
 
-;callback_plugins = /my/plugins/callback
-;roles_path = /my/roles
+# Enable or disable support for for connection pipelining. This has
+# implications for 'become' operations - the 'requiretty' option in
+# /etc/suders must be disabled for pipelining to work correctly.
+pipelining = false
 
 # Mitogen provides impressive speedups
-strategy_plugins = /usr/lib/python3/dist-packages/ansible_mitogen/plugins/strategy
+@@ MITOGEN @@
+
+[ansible diff]
+
+# If enabled, Ansible modules will always show differences when their
+# state has changed. Equivalent to adding '--diff' option on the
+# command line on each execution.
+always = false
 
 [ansible inventory]
 
@@ -45,8 +54,6 @@ strategy_plugins = /usr/lib/python3/dist-packages/ansible_mitogen/plugins/strate
 # playbooks and disabling it is recommended.
 host_pattern_mismatch = ignore
 
-[ansible paramiko]
-;record_host_keys=True
-
 [ansible ssh_connection]
-;ssh_args = -F ~/.ssh/debops-lab/ssh_config
+@@ SSH_ARGS @@
+

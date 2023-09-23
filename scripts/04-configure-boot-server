@@ -4,29 +4,47 @@ set -Eeuo pipefail
 cd "${0%/*}"
 . ./functions.sh
 
-info "#############################"
-info "# BOOT SERVER CONFIGURATION #"
-info "#############################"
+print_header "BOOT SERVER CONFIGURATION"
 
 GUEST_NAME="boot"
 
 activate_python_virtualenv
 
 if [ ! -e "project" ]; then
-	info "Creating DebOps project"
+	print_changed "Creating DebOps project in directory project"
 	debops project init "project" > /dev/null
 	cd "./project"
+
+	print_changed "Installing DebOps configuration from files/debops.cfg.template to project/.debops.cfg"
 	cp "../files/debops.cfg.template" "./.debops.cfg"
-	echo "ssh_args = -F \"${HOME}/.ssh/debops-lab/ssh_config\"" >> "./.debops.cfg"
+
+	if $DL_USE_MITOGEN; then
+		MITOGEN_PATH="$(find ../tmp/python-virtualenv/lib/ -name "ansible_mitogen" -type d)/plugins/strategy/"
+		MITOGEN_PATH_ESC="$(echo "${MITOGEN_PATH}" | sed 's/\//\\\//g')"
+		sed -i -e "s/@@ MITOGEN @@/strategy_plugins = ${MITOGEN_PATH_ESC}/" "./.debops.cfg"
+	else
+		sed -i -e "s/@@ MITOGEN @@/; strategy_plugins =/" "./.debops.cfg"
+	fi
+
+	SSH_CONFIG_PATH="${HOME}/.ssh/debops-lab/ssh_config"
+	SSH_CONFIG_PATH_ESC="$(echo "${SSH_CONFIG_PATH}" | sed 's/\//\\\//g')"
+	sed -i -e "s/@@ SSH_ARGS @@/ssh_args = -F \"${SSH_CONFIG_PATH_ESC}\"/" "./.debops.cfg"
+
+	print_changed "Copying inventory from files/inventory to project/ansible/inventory"
 	rm -rf "./ansible/inventory"
 	cp -a "../files/inventory" "./ansible/inventory"
 
 	if [ ! -z "${DL_CUSTOM_DEBOPS_REPO}" ]; then
+		print_changed "Cloning custom DebOps repo ${DL_CUSTOM_DEBOPS_REPO} to project/debops"
 		git clone --quiet "${DL_CUSTOM_DEBOPS_REPO}" debops
+
 		cd "./debops"
 		if [ ! -z "$DL_CUSTOM_DEBOPS_REPO_BRANCH" ]; then
+			print_changed "Switching custom DebOps repo to branch ${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
 			git checkout --quiet "${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
 		fi
+
+		print_changed "Switching the DebOps installation to use custom repo"
 		pip3 install --editable . > /dev/null 2>&1
 		cd ".."
 	fi
@@ -36,16 +54,25 @@ else
 	cd "./project"
 fi
 
-export ANSIBLE_STRATEGY=mitogen_linear
+if [ ! -e "logs" ]; then
+	print_changed "Creating directory project/logs"
+	mkdir logs
+fi
 
-debops run bootstrap -l "${GUEST_NAME}" -e ansible_user=root
-debops run common -l "${GUEST_NAME}"
-debops run service/tftpd -l "${GUEST_NAME}"
-debops run service/dhcpd -l "${GUEST_NAME}"
-debops run service/ipxe -l "${GUEST_NAME}"
-debops run service/dnsmasq -l "${GUEST_NAME}"
+run_playbook "bootstrap" "${GUEST_NAME}" -e ansible_user=root
 
-info "Host ${GUEST_NAME} configured"
+run_playbook "common" "${GUEST_NAME}"
 
-info ""
+run_playbook "service/tftpd" "${GUEST_NAME}"
+
+run_playbook "service/dhcpd" "${GUEST_NAME}"
+
+run_playbook "service/ipxe" "${GUEST_NAME}"
+
+run_playbook "service/dnsmasq" "${GUEST_NAME}"
+
+print_ok "Guest VM ${GUEST_NAME} configured"
+print_info "Other VMs should be able to PXE boot now"
+
+print_newline
 exit 0
