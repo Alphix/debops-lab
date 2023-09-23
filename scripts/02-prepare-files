@@ -29,7 +29,7 @@ fi
 
 if [ ! -e "tmp/ssh/id_ed25519" ]; then
 	print_changed "Generating SSH key tmp/ssh/id_ed25519"
-	ssh-keygen -t ed25519 -f "id_ed25519" -C "debops-lab-${USER}" -N "" -q
+	ssh-keygen -t ed25519 -f "tmp/ssh/id_ed25519" -C "debops-lab-${USER}" -N "" -q
 else
 	print_ok "SSH key tmp/ssh/id_ed25519 already exists"
 fi
