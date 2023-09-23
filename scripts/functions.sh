@@ -131,7 +131,7 @@ function start_vm {
 
 	if [ ! -e "${QEMU_IMG}" ]; then
 		rm -f "${GUEST_SSH_KNOWN_HOSTS}"
-		info "Performing fresh install of ${GUEST_NAME}"
+		print_changed "Performing fresh install of VM ${GUEST_NAME}"
 		qemu-img create -f qcow2 "${QEMU_IMG}" "${DL_QEMU_DISK_SIZE}" > /dev/null
 		gnome-terminal --tab --wait --title "${GUEST_NAME}-install" --		\
 			qemu-system-x86_64						\
@@ -141,48 +141,67 @@ function start_vm {
 	fi
 
 	if ! lsof "${QEMU_IMG}" > /dev/null; then
-		info "Starting ${GUEST_NAME}"
+		print_changed "Starting VM ${GUEST_NAME}"
 		gnome-terminal --tab --title "${GUEST_NAME}" --				\
 			qemu-system-x86_64						\
 			${DL_QEMU_OPTS}							\
 			${QEMU_EXTRA_OPTS}
+	else
+		print_ok "VM ${GUEST_NAME} is already running"
 	fi
 
 	local ONLINE=0
 
-	info "Waiting for ${GUEST_NAME} to be reachable via SSH"
+	print_info "Waiting for VM ${GUEST_NAME} to be reachable via SSH"
 	for i in $(seq 100); do
 		sleep 3
 
 		if ! ping -c1 -q "${GUEST_IP}" > /dev/null 2>&1; then
+			print_info "Failed to ping VM ${GUEST_NAME} on ${GUEST_IP}, retrying"
 			continue
 		fi
+		print_ok "Managed to ping VM ${GUEST_NAME} on ${GUEST_IP}"
 
 		if [ ! -s "${GUEST_SSH_KNOWN_HOSTS}" ]; then
 			if ! ssh-keyscan "${GUEST_IP}" > "${GUEST_SSH_KNOWN_HOSTS}" 2> /dev/null; then
+				print_info "Failed to keyscan VM ${GUEST_NAME} on ${GUEST_IP}, retrying"
 				rm -f "${GUEST_SSH_KNOWN_HOSTS}"
 				continue
 			fi
 		fi
+		print_ok "Managed to keyscan VM ${GUEST_NAME} on ${GUEST_IP}"
 
-		cat <<EOF > "${GUEST_SSH_CONFIG}"
+		cat <<EOF > "${GUEST_SSH_CONFIG}.tmp"
 Host ${GUEST_NAME} ${GUEST_NAME}.${DL_DOMAIN} ${GUEST_IP}
 	Hostname ${GUEST_IP}
 	UserKnownHostsFile ~/.ssh/debops-lab/hosts/known_host.${GUEST_NAME}
 EOF
 
+		if [ ! -e "${GUEST_SSH_CONFIG}" ]; then
+			mv "${GUEST_SSH_CONFIG}.tmp" "${GUEST_SSH_CONFIG}"
+			print_changed "Installed SSH config for VM ${GUEST_NAME} in ${GUEST_SSH_CONFIG}"
+		elif ! cmp -s "${GUEST_SSH_CONFIG}.tmp" "${GUEST_SSH_CONFIG}"; then
+			mv "${GUEST_SSH_CONFIG}.tmp" "${GUEST_SSH_CONFIG}"
+			print_changed "Updated SSH config for VM ${GUEST_NAME} in ${GUEST_SSH_CONFIG}"
+		else
+			rm -f "${GUEST_SSH_CONFIG}.tmp"
+			print_ok "SSH config for VM ${GUEST_NAME} is up to date"
+		fi
+
+		print_info "Attempting to login via SSH as root to VM ${GUEST_NAME}"
 		if ssh -F "${SSH_CONFIG}" "root@${GUEST_NAME}" hostname > /dev/null 2>&1; then
 			ONLINE=1
 			break
 		fi
+
+		print_info "Failed to login via SSH to VM ${GUEST_NAME}, retrying"
 	done
 
 	if [ "$ONLINE" -ne 1 ]; then
-		echo "Failed to contact ${GUEST_NAME}" >&2
-		exit 1
+		die "Failed to contact ${GUEST_NAME}"
 	fi
 
-	echo "Guest ${GUEST_NAME} online and accepting SSH connections"
+	print_ok "Guest VM ${GUEST_NAME} online and accepting SSH connections"
 }
 
 read_config

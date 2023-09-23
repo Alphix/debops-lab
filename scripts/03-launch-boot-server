@@ -4,9 +4,15 @@ set -Eeuo pipefail
 cd "${0%/*}"
 . ./functions.sh
 
-info "###########################"
-info "# BOOT SERVER PREPARATION #"
-info "###########################"
+print_header "BOOT SERVER PREPARATION"
+
+if [ -z "${DL_BRIDGE_ADDRESS:-}" ]; then
+	die "DL_BRIDGE_ADDRESS is not set"
+elif [ -z "${DL_NAMESERVER:-}" ]; then
+	die "DL_NAMESERVER is not set"
+elif [ -z "${DL_DOMAIN:-}" ]; then
+	die "DL_DOMAIN is not set"
+fi
 
 GUEST_NAME="boot"
 GUEST_IP="192.168.99.253"
@@ -30,5 +36,5 @@ BOOT_ARGS+=("-append" "${BOOT_APPEND}")
 
 start_vm "boot" "253" "${BOOT_ARGS[@]}"
 
-info ""
+print_newline
 exit 0
