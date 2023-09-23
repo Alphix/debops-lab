@@ -73,7 +73,7 @@ function get_file {
 		fi
 	else
 		rm -f "${FILE}" "${ETAG}"
-		print_changed "Downloading file ${FILE} from ${URI}"
+		print_changed "Downloading file ${FILE}"
 		print_info "URI: ${URI}"
 		curl -s -o "${FILE}" --etag-compare "${ETAG}" --etag-save "${ETAG}" "${URI}"
 	fi
