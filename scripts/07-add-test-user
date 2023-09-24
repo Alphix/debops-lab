@@ -1,0 +1,165 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+cd "${0%/*}"
+. ./functions.sh
+
+print_header "ADD TEST USER TO LDAP"
+
+NEW_USER_NAME="bob"
+NEW_USER_FIRST_NAME="${NEW_USER_NAME^}"
+NEW_USER_LAST_NAME="Smith"
+NEW_USER_DN="uid=${NEW_USER_NAME},ou=People,dc=example,dc=com"
+LDAP_ADMIN_DN="uid=${USER},ou=People,dc=example,dc=com"
+LDAP_ADMIN_PWD_FILE="$(pwd)/tmp/ldap_admin.pwd"
+LDAP_CONF="$(pwd)/tmp/ldap.conf"
+
+activate_python_virtualenv
+
+cd "./project"
+if [ ! -e "${LDAP_ADMIN_PWD_FILE}" ]; then
+	print_info "Trying to determine the LDAP admin password"
+
+	# Fetch and store a copy of the LDAP admin password in a convenient
+	# location. This is *not* how you'd do things in a production
+	# environment, but for demonstration purposes.
+	ADMIN_UUID="$(debops run ldap/get-uuid -e "object_dn=${LDAP_ADMIN_DN}" -l qtest1 2>&1 | grep "UUID:" | sed 's/.*:\s*\([^\s]*\).*/\1/')"
+	if [ ! -e "./ansible/secret/ldap/credentials/${ADMIN_UUID}.password" ]; then
+		die "Unable to find the admin LDAP password, looked for ${ADMIN_UUID}.password"
+	fi
+
+	# This stores a copy of the password without a trailing newline, for use by the ldap* tools
+	echo -n "$(cat "./ansible/secret/ldap/credentials/${ADMIN_UUID}.password")" >> "${LDAP_ADMIN_PWD_FILE}"
+
+	# ldap tools like to complain about insecure file permissions (rightfully so)
+	chmod 0400 "${LDAP_ADMIN_PWD_FILE}"
+
+	print_changed "The LDAP admin password has been stored in ${LDAP_ADMIN_PWD_FILE}"
+fi
+
+if [ ! -e "${LDAP_CONF}" ]; then
+	cat <<-EOF > "${LDAP_CONF}"
+		#
+		# LDAP Defaults
+		#
+
+		# See ldap.conf(5) for details
+		# Note that these settings are *UNSAFE* and only suitable for testing purposes
+
+		BASE		dc=example,dc=com
+		URI		ldap://192.168.99.1/
+
+		# This allows invalid certs to be accepted (bad idea)
+		TLS_REQCERT	allow
+
+		BINDDN		${LDAP_ADMIN_DN}
+		EOF
+	print_changed "LDAP configuration stored in ${LDAP_CONF}"
+fi
+
+export LDAPRC="${LDAP_CONF}"
+
+print_info "Getting list of current LDAP users (inetOrgPerson entries)"
+LDAP_USERS="$(
+	ldapsearch -Z -x -LLL -y "${LDAP_ADMIN_PWD_FILE}" \
+		"(objectClass=inetOrgPerson)" "dn" |
+	sed '/^\s*$/d')"
+
+print_info "List of current LDAP users (inetOrgPerson entries):"
+echo "${LDAP_USERS}" | while read -r USER; do printf '\t%s\n' "${USER}"; done
+
+if grep -q "^dn: ${NEW_USER_DN}$" <<< "${LDAP_USERS}"; then
+	print_info "LDAP user ${NEW_USER_NAME} already exists (${NEW_USER_DN})"
+else
+	print_info "Checking which UID to use for new user ${NEW_USER_NAME}"
+	NEXT_UID="$(ldapsearch -Z -x -LLL -y "${LDAP_ADMIN_PWD_FILE}" -o ldif-wrap=no \
+		"(&(objectClass=uidNext)(cn=Next POSIX UID))" "uidNumber" |
+		sed -n 's/^uidNumber:\s*//p')"
+
+	print_changed "Reserving UID ${NEXT_UID} for user ${NEW_USER_NAME}"
+	# shellcheck disable=SC2004
+	NEW_NEXT_UID=$(( ${NEXT_UID} + 1 ))
+	ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" > /dev/null <<-EOF
+		dn: cn=Next POSIX UID,ou=System,dc=example,dc=com
+		changetype: modify
+		delete: uidNumber
+		uidNumber: ${NEXT_UID}
+		-
+		add: uidNumber
+		uidNumber: ${NEW_NEXT_UID}
+	EOF
+
+	print_changed "Adding new user ${NEW_USER_NAME}"
+	USER_UID="${NEXT_UID}"
+	ldapadd -Z -x -y "${LDAP_ADMIN_PWD_FILE}" > /dev/null <<-EOF
+		dn: ${NEW_USER_DN}
+		uid: ${NEW_USER_NAME}
+		gid: ${NEW_USER_NAME}
+		uidNumber: ${USER_UID}
+		gidNumber: ${USER_UID}
+		cn: ${NEW_USER_FIRST_NAME} ${NEW_USER_LAST_NAME}
+		sn: ${NEW_USER_LAST_NAME}
+		givenName: ${NEW_USER_LAST_NAME}
+		homeDirectory: /home/${NEW_USER_NAME}
+		loginShell: /bin/bash
+		authorizedService: all
+		host: posix:all
+		objectClass: inetOrgPerson
+		objectClass: posixAccount
+		objectClass: shadowAccount
+		objectClass: posixGroup
+		objectClass: posixGroupId
+		objectClass: ldapPublicKey
+		objectClass: authorizedServiceObject
+		objectClass: hostObject
+		objectClass: mailRecipient
+		mail: ${NEW_USER_NAME}@example.com
+		mailAddress: ${NEW_USER_NAME}@example.com
+	EOF
+
+	print_changed "Adding a SSH key for user ${NEW_USER_NAME}"
+	ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" > /dev/null <<-EOF
+		dn: ${NEW_USER_DN}
+		changeType: modify
+		add: sshPublicKey
+		sshPublicKey: $(cat ../tmp/ssh/id_ed25519.pub)
+	EOF
+
+	print_changed "Adding ${NEW_USER_NAME} to the UNIX SSH users group"
+	ldapmodify -Z -x -y "${LDAP_ADMIN_PWD_FILE}" > /dev/null <<-EOF
+		dn: cn=UNIX SSH users,ou=Groups,dc=example,dc=com
+		changeType: modify
+		add: member
+		member: ${NEW_USER_DN}
+	EOF
+
+	KRB5_CONFIG="./ansible/secret/kerberos/krb5.conf"
+	export KRB5_CONFIG
+	# Note: if cert-based admin authentication is setup, this will be ignored
+	KRB5_KEYTAB="./ansible/secret/kerberos/admin.keytab"
+	KRB5_ADMIN_PRINC="${USER}/admin@EXAMPLE.COM"
+	KRB5_USER_PRINC="${NEW_USER_NAME}@EXAMPLE.COM"
+
+	if kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_ADMIN_PRINC}"	\
+		listpols | grep -q "^testing$"; then
+		print_info "Relaxed Kerberos password policy testing already exists"
+	else
+		print_changed "Adding a relaxed Kerberos pwd policy for testing purposes"
+		kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_ADMIN_PRINC}"		\
+			addpol -minlength 1 -minclasses 1 testing
+	fi
+
+	# Wrt -pwexpire, see https://github.com/SSSD/sssd/issues/6612
+	print_changed "Adding a kerberos principal ${KRB5_USER_PRINC} for user ${NEW_USER_NAME}"
+	kadmin -k -t "${KRB5_KEYTAB}" -p "${KRB5_ADMIN_PRINC}"		\
+		addprinc -policy testing -pw 123abc			\
+		-pwexpire "2030-01-01"					\
+		+requires_preauth +lockdown_keys			\
+		-x "dn=${NEW_USER_DN}"					\
+		"${KRB5_USER_PRINC}"
+
+	print_info "New user ${NEW_USER_NAME} configured"
+fi
+
+print_newline
+exit 0
