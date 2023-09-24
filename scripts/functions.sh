@@ -84,7 +84,6 @@ function print_info {
 
 
 function finished {
-	print_ok "Done"
 	printf '\n'
 	exit 0
 }

@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 source "${0%/*}/functions.sh"
 
-print_header "LDAP/KERBEROS CONFIGURATION"
+print_header "06 - LDAP/KERBEROS CONFIGURATION"
 
 GUEST_NAME="qtest1"
 
