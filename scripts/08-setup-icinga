@@ -26,11 +26,7 @@ run_playbook "service/icinga_db" "qtest1"
 run_playbook "service/icinga_web" "qtest1"
 
 # Run on all, including qtest1, so they register with the director
-# Note: the icinga role is racy since each run kicks off the director, which
-# will respond with a HTTP 500 code if it's already updating the cfg...
-run_playbook "service/icinga" "qtest1"
-run_playbook "service/icinga" "qtest2"
-run_playbook "service/icinga" "qtest3"
+run_playbook "service/icinga"
 
 print_info "Icinga configured"
 print_info "Login: root"
