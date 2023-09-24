@@ -1,0 +1,40 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+cd "${0%/*}"
+. ./functions.sh
+
+print_header "ICINGA CONFIGURATION"
+
+activate_python_virtualenv
+
+cd "./project"
+
+LDAPRC="$(pwd)/tmp/ldap.conf"
+export LDAPRC
+KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
+export KRB5_CONFIG
+
+run_playbook "service/postgresql_server" "qtest1"
+
+run_playbook "service/postgresql"
+
+run_playbook "service/icinga" "qtest1"
+
+run_playbook "service/icinga_db" "qtest1"
+
+run_playbook "service/icinga_web" "qtest1"
+
+# Run on all, including qtest1, so they register with the director
+# Note: the icinga role is racy since each run kicks off the director, which
+# will respond with a HTTP 500 code if it's already updating the cfg...
+run_playbook "service/icinga" "qtest1"
+run_playbook "service/icinga" "qtest2"
+run_playbook "service/icinga" "qtest3"
+
+print_info "Icinga configured"
+print_info "Login: root"
+print_info "Pass : $(cat ansible/secret/icinga_web/auth/qtest1/credentials/root/password)"
+
+print_newline
+exit 0

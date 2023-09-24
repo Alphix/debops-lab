@@ -102,7 +102,7 @@ qtest3
 qtest2
 
 [debops_service_postgresql_server]
-qtest2
+qtest1
 
 [debops_service_postgresql]
 qtest1

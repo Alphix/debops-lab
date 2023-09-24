@@ -7,5 +7,7 @@ set -Eeuo pipefail
 ./scripts/03-launch-boot-server
 ./scripts/04-configure-boot-server
 ./scripts/05-launch-other-servers
-./scripts/06-configure-qtest1
+./scripts/06-configure-other-servers
+./scripts/07-add-test-user
+./scripts/08-setup-icinga
 

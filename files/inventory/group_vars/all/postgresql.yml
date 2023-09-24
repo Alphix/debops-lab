@@ -1,20 +1,28 @@
-postgresql_server__listen_addresses: [ 'localhost', '192.168.99.2' ]
+postgresql_server__listen_addresses: [ 'localhost', '192.168.99.1' ]
 
 postgresql_server__allow: [ '192.168.99.0/24' ]
 
 postgresql_server__hba_remote:
 
-  - comment:  'Icinga connections from local networks'
-    type:     'host'
+  - comment:  'Icinga connections from local SSL networks'
+    type:     'hostssl'
     database: 'all'
     user:     'all'
     address:  '192.168.99.0/24'
     method:   'md5'
 
-  - comment:  'Remote connections from local networks'
-    type:     'hostssl'
-    database: 'samerole'
-    user:     'all'
-    address:  'samenet'
-    method:   'md5'
+#  - comment:  'Icinga connections from local networks'
+#    type:     'host'
+#    database: 'all'
+#    user:     'all'
+#    address:  '192.168.99.0/24'
+#    method:   'md5'
+#
+#  - comment:  'Remote connections from local networks'
+#    type:     'hostssl'
+#    database: 'samerole'
+#    user:     'all'
+#    address:  'samenet'
+#    method:   'md5'
 
+postgresql__server: 'qtest1.example.com'
