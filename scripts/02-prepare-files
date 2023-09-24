@@ -1,44 +1,46 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "FILE PREPARATION"
+print_header "02 - FILE PREPARATION"
 
-if [ ! -d "tmp" ]; then
-	print_changed "Creating directory tmp"
-	mkdir "tmp"
+if [ ! -d "lab" ]; then
+	print_changed "Creating directory ${DL_PROJECT_DIR}/lab"
+	mkdir "lab"
 else
-	print_ok "Directory tmp already exists"
+	print_ok "Directory ${DL_PROJECT_DIR}/lab already exists"
 fi
 
-if [ ! -d "tmp/ssh" ]; then
-	print_changed "Creating directory tmp/ssh"
-	mkdir "tmp/ssh"
+if [ ! -d "lab/ssh" ]; then
+	print_changed "Creating directory ${DL_PROJECT_DIR}/lab/ssh"
+	mkdir "lab/ssh"
 else
-	print_ok "Directory tmp/ssh already exists"
+	print_ok "Directory ${DL_PROJECT_DIR}/lab/ssh already exists"
 fi
 
-if [ ! -d "tmp/ssh/hosts" ]; then
-	print_changed "Creating directory tmp/ssh/hosts"
-	mkdir "tmp/ssh/hosts"
+if [ ! -d "lab/ssh/hosts" ]; then
+	print_changed "Creating directory ${DL_PROJECT_DIR}/lab/ssh/hosts"
+	mkdir "lab/ssh/hosts"
 else
-	print_ok "Directory tmp/ssh/hosts already exists"
+	print_ok "Directory ${DL_PROJECT_DIR}/lab/hosts already exists"
 fi
 
-if [ ! -e "tmp/ssh/id_ed25519" ]; then
-	print_changed "Generating SSH key tmp/ssh/id_ed25519"
-	ssh-keygen -t ed25519 -f "tmp/ssh/id_ed25519" -C "debops-lab-${USER}" -N "" -q
+if [ ! -e "lab/ssh/id_ed25519" ]; then
+	print_changed "Generating SSH key ${DL_PROJECT_DIR}/lab/ssh/id_ed25519"
+	ssh-keygen -t ed25519 -f "lab/ssh/id_ed25519" -C "debops-lab-${USER}" -N "" -q
 else
-	print_ok "SSH key tmp/ssh/id_ed25519 already exists"
+	print_ok "SSH key ${DL_PROJECT_DIR}/lab/ssh/id_ed25519 already exists"
 fi
 
-if [ ! -e "tmp/ssh/ssh_config" ]; then
-	print_changed "Installing files/ssh_config to tmp/ssh/ssh_config"
-	cp "./files/ssh_config" "./tmp/ssh/"
+if [ ! -e "lab/ssh/ssh_config" ]; then
+	if [ ! -e "../files/ssh_config" ]; then
+		die "File files/ssh_config not found"
+	fi
+	print_changed "Installing files/ssh_config to ${DL_PROJECT_DIR}/lab/ssh/ssh_config"
+	cp "../files/ssh_config" "./lab/ssh/"
 else
-	print_ok "Custom ssh_config already exists at tmp/ssh/ssh_config"
+	print_ok "Custom ssh_config already exists at ${DL_PROJECT_DIR}/lab/ssh/ssh_config"
 fi
 
 if [ ! -e ~/.ssh ]; then
@@ -49,8 +51,8 @@ else
 fi
 
 if [ ! -e ~/.ssh/debops-lab ]; then
-	print_changed "Linking ~/.ssh/debops-lab to tmp/ssh"
-	ln -sf "${PWD}/tmp/ssh" ~/.ssh/debops-lab
+	print_changed "Linking ~/.ssh/debops-lab to ${DL_PROJECT_DIR}/lab/ssh"
+	ln -sf "${PWD}/lab/ssh" ~/.ssh/debops-lab
 else
 	print_ok "Link ~/.ssh/debops-lab already exists"
 fi
@@ -64,19 +66,19 @@ function get_file {
 		local OLD_CHECKSUM
 		local NEW_CHECKSUM
 
-		print_info "Checking for an updated version of ${FILE}"
+		print_info "Checking for an updated version of ${DL_PROJECT_DIR}/${FILE}"
 		print_info "URI: ${URI}"
 		OLD_CHECKSUM="$(sha256sum "${FILE}")"
 		curl -s -o "${FILE}" --etag-compare "${ETAG}" --etag-save "${ETAG}" "${URI}"
 		NEW_CHECKSUM="$(sha256sum "${FILE}")"
 		if [ "${OLD_CHECKSUM}" = "${NEW_CHECKSUM}" ]; then
-			print_ok "File ${FILE} is already current"
+			print_ok "File ${DL_PROJECT_DIR}/${FILE} is already current"
 		else
-			print_changed "File ${FILE} updated"
+			print_changed "File ${DL_PROJECT_DIR}/${FILE} updated"
 		fi
 	else
 		rm -f "${FILE}" "${ETAG}"
-		print_changed "Downloading file ${FILE}"
+		print_changed "Downloading file ${DL_PROJECT_DIR}/${FILE}"
 		print_info "URI: ${URI}"
 		curl -s -o "${FILE}" --etag-compare "${ETAG}" --etag-save "${ETAG}" "${URI}"
 	fi
@@ -87,16 +89,16 @@ function get_file {
 	fi
 }
 
-get_file "tmp/initrd.gz" "${DL_INITRD_URL}"
-get_file "tmp/linux" "${DL_KERNEL_URL}"
+get_file "lab/initrd.gz" "${DL_INITRD_URL}"
+get_file "lab/linux" "${DL_KERNEL_URL}"
 
-if [ ! -e "./files/preseed.cfg.template" ]; then
+if [ ! -e "../files/preseed.cfg.template" ]; then
 	die "Preseed template file files/preseed.cfg.template missing"
-elif [ ! -e "./tmp/preseed.cfg" ] || [ "./files/preseed.cfg.template" -nt "./tmp/preseed.cfg" ]; then
-	print_changed "Generating preseed file tmp/preseed.cfg from template files/preseed.cfg.template"
+elif [ ! -e "./lab/preseed.cfg" ] || [ "../files/preseed.cfg.template" -nt "./lab/preseed.cfg" ]; then
+	print_changed "Generating preseed file ${DL_PROJECT_DIR}/lab/preseed.cfg from template files/preseed.cfg.template"
 	SSH_KEYS="$(cat ~/.ssh/debops-lab/*.pub)"
-	cp "./files/preseed.cfg.template" "./tmp/preseed.cfg"
-	cat <<-EOF >> "./tmp/preseed.cfg"
+	cp "../files/preseed.cfg.template" "./lab/preseed.cfg"
+	cat <<-EOF >> "./lab/preseed.cfg"
 		d-i passwd/root-password password ${DL_DI_ROOT_PW}
 		d-i passwd/root-password-again password ${DL_DI_ROOT_PW}
 		d-i debian-installer/country string ${DL_DI_COUNTRY}
@@ -110,17 +112,17 @@ elif [ ! -e "./tmp/preseed.cfg" ] || [ "./files/preseed.cfg.template" -nt "./tmp
 			chmod 600 /root/.ssh/authorized_keys"
 		EOF
 	if [ -n "${DL_DI_PROXY:-}" ]; then
-		echo "d-i mirror/http/proxy string ${DL_DI_PROXY}" >> ./tmp/preseed.cfg
+		echo "d-i mirror/http/proxy string ${DL_DI_PROXY}" >> "./lab/preseed.cfg"
 	fi
 else
-	print_ok "Preseed file tmp/preseed.cfg is up to date"
+	print_ok "Preseed file ${DL_PROJECT_DIR}/lab/preseed.cfg is up to date"
 fi
 
-if [ ! -e "./tmp/initrd-mod.gz" ] || \
-   [ "./tmp/preseed.cfg" -nt "./tmp/initrd-mod.gz" ] || \
-   [ "./tmp/initrd.gz" -nt "./tmp/initrd-mod.gz" ]; then
-	print_changed "Creating updated preseeded initrd in tmp/initrd-mod.gz"
-	cd tmp
+if [ ! -e "./lab/initrd-mod.gz" ] || \
+   [ "./lab/preseed.cfg" -nt "./lab/initrd-mod.gz" ] || \
+   [ "./lab/initrd.gz" -nt "./lab/initrd-mod.gz" ]; then
+	print_changed "Creating updated preseeded initrd in ${DL_PROJECT_DIR}/lab/initrd-mod.gz"
+	cd lab
 	rm -f initrd-mod.gz
 	gunzip --keep initrd.gz
 	echo preseed.cfg | cpio -H newc -o -A -F initrd --quiet
@@ -128,8 +130,7 @@ if [ ! -e "./tmp/initrd-mod.gz" ] || \
 	gzip initrd-mod
 	cd ..
 else
-	print_ok "Preseeded initrd in tmp/initrd-mod.gz is up to date"
+	print_ok "Preseeded initrd in ${DL_PROJECT_DIR}/lab/initrd-mod.gz is up to date"
 fi
 
-print_newline
-exit 0
+finished

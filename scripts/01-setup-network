@@ -1,10 +1,9 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "NETWORKING SETUP"
+print_header "01 - NETWORKING SETUP"
 
 if [ -z "${DL_BRIDGE_NAME:-}" ]; then
 	die "DL_BRIDGE_NAME is not set"
@@ -106,5 +105,4 @@ else
 	sudo sh -c 'echo 1 >> /proc/sys/net/ipv4/ip_forward'
 fi
 
-print_newline
-exit 0
+finished

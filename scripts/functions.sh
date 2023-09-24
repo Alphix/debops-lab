@@ -1,14 +1,26 @@
-function read_config {
-	. ../default.cfg
+#!/bin/bash
+# shellcheck disable=SC2034
+# SC2034: Unused variables (index in the for loop and colors)
 
-	if [ -e ../custom.cfg ]; then
-		. ../custom.cfg
+function read_config {
+	if [ ! -e "default.cfg" ]; then
+		die "Couldn't find default.cfg"
+	fi
+
+	source "default.cfg"
+
+	if [ -e "custom.cfg" ]; then
+		source "custom.cfg"
 	fi
 
 	if [ "${DL_USE_MITOGEN:-no}" = "yes" ]; then
 		DL_USE_MITOGEN=true
 	else
 		DL_USE_MITOGEN=false
+	fi
+
+	if [ -z "${DL_PROJECT_DIR:-}" ]; then
+		DL_PROJECT_DIR="project"
 	fi
 }
 
@@ -41,8 +53,8 @@ fi
 
 function print_header {
 	local TITLE="### ${1} ###"
-	local LEN="${#TITLE}"
-	local BAR="$(printf '#%.0s' $(seq 1 ${LEN}))"
+	local BAR
+	BAR="$(printf '#%.0s' $(seq 1 ${#TITLE}))"
 
 	printf '%b%s%b\n' "${GREY}" "${BAR}" "${NC}"
 	printf '%b%s%b\n' "${GREY}" "${TITLE}" "${NC}"
@@ -71,8 +83,10 @@ function print_info {
 }
 
 
-function print_newline {
+function finished {
+	print_ok "Done"
 	printf '\n'
+	exit 0
 }
 
 
@@ -86,16 +100,17 @@ function die {
 function activate_python_virtualenv {
 	#sudo apt install build-essential python3-virtualenv virtualenv python3-dev \
         #         libffi-dev libssl-dev libsasl2-dev libldap2-dev python3-pip
-	if [ ! -e "./tmp" ]; then
-		mkdir "./tmp"
+	if [ ! -e "./lab" ]; then
+		mkdir "./lab"
 	fi
 
-	if [ ! -e "./tmp/python-virtualenv" ]; then
-		print_changed "Creating python virtual environment in tmp/python-virtualenv"
-		virtualenv "./tmp/python-virtualenv" > /dev/null 2>&1
+	if [ ! -e "./lab/python-virtualenv" ]; then
+		print_changed "Creating python virtual environment in ${DL_PROJECT_DIR}/lab/python-virtualenv"
+		virtualenv "./lab/python-virtualenv" > /dev/null 2>&1
 	fi
 
-	source "./tmp/python-virtualenv/bin/activate"
+	# shellcheck disable=SC1091
+	source "./lab/python-virtualenv/bin/activate"
 
 	if pip3 show -qqq debops && pip3 show -qqq ansible; then
 		print_ok "DebOps and Ansible are installed in the virtual environment"
@@ -104,7 +119,7 @@ function activate_python_virtualenv {
 		pip3 install debops[ansible] > /dev/null 2>&1
 	fi
 
-	if $DL_USE_MITOGEN; then
+	if ${DL_USE_MITOGEN}; then
 		if pip3 show -qqq mitogen; then
 			print_ok "Mitogen is installed in the virtual environment"
 		else
@@ -117,8 +132,8 @@ function activate_python_virtualenv {
 			#   - https://github.com/mitogen-hq/mitogen/issues/1021
 			print_changed "Bumping the max supported Ansible version for Mitogen"
 			sed -i 's/^ANSIBLE_VERSION_MAX\s*=.*/ANSIBLE_VERSION_MAX = (2, 99)/' \
-				./tmp/python-virtualenv/lib/*/site-packages/ansible_mitogen/loaders.py
-			rm -rf ./tmp/python-virtualenv/lib/*/site-packages/ansible_mitogen/__pycache__
+				./lab/python-virtualenv/lib/*/site-packages/ansible_mitogen/loaders.py
+			rm -rf ./lab/python-virtualenv/lib/*/site-packages/ansible_mitogen/__pycache__
 		fi
 	fi
 }
@@ -136,7 +151,8 @@ function run_playbook {
 	fi
 
 	local PLAYBOOK="$1"
-	local PLAYBOOK_ESC="$(echo "${PLAYBOOK}" | tr "/" "_")"
+	local PLAYBOOK_ESC
+	PLAYBOOK_ESC="$(echo "${PLAYBOOK}" | tr "/" "_")"
 	local ARGS=("${PLAYBOOK}")
 	shift
 
@@ -148,10 +164,15 @@ function run_playbook {
 		local HOST="all"
 	fi
 
+	if [ ! -e "logs" ]; then
+		print_changed "Creating directory ${DL_PROJECT_DIR}/logs"
+		mkdir "logs"
+	fi
+
 	ARGS+=("${@}")
 	local LOGFILE="logs/${HOST}-${PLAYBOOK_ESC}.log"
 
-	if $DL_USE_MITOGEN; then
+	if ${DL_USE_MITOGEN}; then
 		export ANSIBLE_STRATEGY=mitogen_linear
 	else
 		unset ANSIBLE_STRATEGY
@@ -176,28 +197,29 @@ function start_vm {
 	shift
 	local GUEST_INSTALL_ARGS=("$@")
 
-	if [ "${GUEST_ID}" -lt 1 -o "${GUEST_ID}" -gt 253 ]; then
+	if [ "${GUEST_ID}" -lt 1 ] || [ "${GUEST_ID}" -gt 253 ]; then
 		die "Invalid guest id passed to start_vm()"
 	fi
 
 	local GUEST_IP="192.168.99.${GUEST_ID}"
-	local GUEST_MAC="$(printf "52:54:00:00:00:%02x" "${GUEST_ID}")"
+	local GUEST_MAC
+	GUEST_MAC="$(printf "52:54:00:00:00:%02x" "${GUEST_ID}")"
 	local GUEST_NETDEV="tap${GUEST_ID}"
-	local QEMU_IMG="./tmp/vm-disks/${GUEST_NAME}.img"
+	local QEMU_IMG="./lab/vm-disks/${GUEST_NAME}.img"
 	local QEMU_EXTRA_OPTS="-name ${GUEST_NAME}"
 	QEMU_EXTRA_OPTS+=" -drive file=${QEMU_IMG},format=qcow2,cache=unsafe,if=virtio,aio=io_uring"
 	QEMU_EXTRA_OPTS+=" -device virtio-net,netdev=network0,mac=${GUEST_MAC}"
 	QEMU_EXTRA_OPTS+=" -netdev tap,id=network0,ifname=${GUEST_NETDEV},script=no,downscript=no"
-	local GUEST_SSH_KNOWN_HOSTS="./tmp/ssh/hosts/known_host.${GUEST_NAME}"
-	local GUEST_SSH_CONFIG="./tmp/ssh/hosts/${GUEST_NAME}.conf"
-	local SSH_CONFIG="./tmp/ssh/ssh_config"
+	local GUEST_SSH_KNOWN_HOSTS="./lab/ssh/hosts/known_host.${GUEST_NAME}"
+	local GUEST_SSH_CONFIG="./lab/ssh/hosts/${GUEST_NAME}.conf"
+	local SSH_CONFIG="./lab/ssh/ssh_config"
 
-	if [ ! -d "tmp/ssh/hosts" ]; then
-		mkdir -p "tmp/ssh/hosts"
+	if [ ! -d "lab/ssh/hosts" ]; then
+		mkdir -p "lab/ssh/hosts"
 	fi
 
-	if [ ! -d "tmp/vm-disks" ]; then
-		mkdir -p "tmp/vm-disks"
+	if [ ! -d "lab/vm-disks" ]; then
+		mkdir -p "lab/vm-disks"
 	fi
 
 	if [ ! -e "${QEMU_IMG}" ]; then
@@ -250,10 +272,10 @@ EOF
 
 		if [ ! -e "${GUEST_SSH_CONFIG}" ]; then
 			mv "${GUEST_SSH_CONFIG}.tmp" "${GUEST_SSH_CONFIG}"
-			print_changed "Installed SSH config for VM ${GUEST_NAME} in ${GUEST_SSH_CONFIG}"
+			print_changed "Installed SSH config for VM ${GUEST_NAME} in ${DL_PROJECT_DIR}${GUEST_SSH_CONFIG#.}"
 		elif ! cmp -s "${GUEST_SSH_CONFIG}.tmp" "${GUEST_SSH_CONFIG}"; then
 			mv "${GUEST_SSH_CONFIG}.tmp" "${GUEST_SSH_CONFIG}"
-			print_changed "Updated SSH config for VM ${GUEST_NAME} in ${GUEST_SSH_CONFIG}"
+			print_changed "Updated SSH config for VM ${GUEST_NAME} in ${DL_PROJECT_DIR}${GUEST_SSH_CONFIG#.}"
 		else
 			rm -f "${GUEST_SSH_CONFIG}.tmp"
 			print_ok "SSH config for VM ${GUEST_NAME} is up to date"
@@ -268,13 +290,18 @@ EOF
 		print_info "Failed to login via SSH to VM ${GUEST_NAME}, retrying"
 	done
 
-	if [ "$ONLINE" -ne 1 ]; then
+	if [ "${ONLINE}" -ne 1 ]; then
 		die "Failed to contact ${GUEST_NAME}"
 	fi
 
 	print_ok "Guest VM ${GUEST_NAME} online and accepting SSH connections"
 }
 
-
+cd "${0%/*}/.." || die "Failed to chdir to root directory"
 read_config
-cd ".."
+if [ ! -d "${DL_PROJECT_DIR}" ]; then
+	if ! mkdir "${DL_PROJECT_DIR}"; then
+		die "Failed to create project directory ${DL_PROJECT_DIR}"
+	fi
+fi
+cd "${DL_PROJECT_DIR}" || die "Failed to chdir to ${DL_PROJECT_DIR}"

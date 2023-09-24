@@ -1,25 +1,23 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "BOOT SERVER CONFIGURATION"
+print_header "04 - BOOT SERVER CONFIGURATION"
 
 GUEST_NAME="boot"
 
 activate_python_virtualenv
 
-if [ ! -e "project" ]; then
-	print_changed "Creating DebOps project in directory project"
-	debops project init "project" > /dev/null
-	cd "./project"
+if [ ! -e ".debops.cfg" ]; then
+	print_changed "Creating DebOps project in directory ${DL_PROJECT_DIR}"
+	debops project init "." > /dev/null
 
-	print_changed "Installing DebOps configuration from files/debops.cfg.template to project/.debops.cfg"
+	print_changed "Installing DebOps configuration from files/debops.cfg.template to ${DL_PROJECT_DIR}/.debops.cfg"
 	cp "../files/debops.cfg.template" "./.debops.cfg"
 
 	if ${DL_USE_MITOGEN}; then
-		MITOGEN_PATH="$(find ../tmp/python-virtualenv/lib/ -name "ansible_mitogen" -type d)/plugins/strategy/"
+		MITOGEN_PATH="$(find ./lab/python-virtualenv/lib/ -name "ansible_mitogen" -type d)/plugins/strategy/"
 		MITOGEN_PATH_ESC="$(echo "${MITOGEN_PATH}" | sed 's/\//\\\//g')"
 		sed -i -e "s/@@ MITOGEN @@/strategy_plugins = ${MITOGEN_PATH_ESC}/" "./.debops.cfg"
 	else
@@ -30,12 +28,12 @@ if [ ! -e "project" ]; then
 	SSH_CONFIG_PATH_ESC="$(echo "${SSH_CONFIG_PATH}" | sed 's/\//\\\//g')"
 	sed -i -e "s/@@ SSH_ARGS @@/ssh_args = -F \"${SSH_CONFIG_PATH_ESC}\"/" "./.debops.cfg"
 
-	print_changed "Copying inventory from files/inventory to project/ansible/inventory"
+	print_changed "Copying inventory from files/inventory to ${DL_PROJECT_DIR}/ansible/inventory"
 	rm -rf "./ansible/inventory"
 	cp -a "../files/inventory" "./ansible/inventory"
 
 	if [ -n "${DL_CUSTOM_DEBOPS_REPO:-}" ]; then
-		print_changed "Cloning custom DebOps repo ${DL_CUSTOM_DEBOPS_REPO} to project/debops"
+		print_changed "Cloning custom DebOps repo ${DL_CUSTOM_DEBOPS_REPO} to ${DL_PROJECT_DIR}/debops"
 		git clone --quiet "${DL_CUSTOM_DEBOPS_REPO}" debops
 
 		cd "./debops"
@@ -50,13 +48,6 @@ if [ ! -e "project" ]; then
 	fi
 
 	debops project refresh > /dev/null
-else
-	cd "./project"
-fi
-
-if [ ! -e "logs" ]; then
-	print_changed "Creating directory project/logs"
-	mkdir logs
 fi
 
 run_playbook "bootstrap" "${GUEST_NAME}" -e ansible_user=root
@@ -74,5 +65,4 @@ run_playbook "service/dnsmasq" "${GUEST_NAME}"
 print_ok "Guest VM ${GUEST_NAME} configured"
 print_info "Other VMs should be able to PXE boot now"
 
-print_newline
-exit 0
+finished

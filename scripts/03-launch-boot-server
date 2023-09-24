@@ -1,10 +1,9 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "BOOT SERVER PREPARATION"
+print_header "03 - BOOT SERVER PREPARATION"
 
 if [ -z "${DL_BRIDGE_ADDRESS:-}" ]; then
 	die "DL_BRIDGE_ADDRESS is not set"
@@ -30,11 +29,10 @@ BOOT_APPEND+=" netcfg/get_nameservers=${DL_NAMESERVER}"
 BOOT_APPEND+=" hostname=${GUEST_NAME}"
 BOOT_APPEND+=" domain=${DL_DOMAIN}"
 
-BOOT_ARGS=("-kernel" "./tmp/linux")
-BOOT_ARGS+=("-initrd" "./tmp/initrd-mod.gz")
+BOOT_ARGS=("-kernel" "./lab/linux")
+BOOT_ARGS+=("-initrd" "./lab/initrd-mod.gz")
 BOOT_ARGS+=("-append" "${BOOT_APPEND}")
 
 start_vm "boot" "253" "${BOOT_ARGS[@]}"
 
-print_newline
-exit 0
+finished

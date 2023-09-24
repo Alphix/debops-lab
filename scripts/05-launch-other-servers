@@ -1,10 +1,9 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "OTHER SERVER(S) PREPARATION"
+print_header "05 - OTHER SERVER(S) PREPARATION"
 
 print_info "Launching VM qtest1 (in parallel)"
 start_vm "qtest1" "1" &
@@ -18,5 +17,4 @@ start_vm "qtest3" "3" &
 wait
 print_ok "All VMs finished are up and running"
 
-print_newline
-exit 0
+finished

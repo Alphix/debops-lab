@@ -1,22 +1,20 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "ADD TEST USER TO LDAP"
+print_header "07 - ADD A TEST USER TO LDAP"
 
 NEW_USER_NAME="bob"
 NEW_USER_FIRST_NAME="${NEW_USER_NAME^}"
 NEW_USER_LAST_NAME="Smith"
 NEW_USER_DN="uid=${NEW_USER_NAME},ou=People,dc=example,dc=com"
 LDAP_ADMIN_DN="uid=${USER},ou=People,dc=example,dc=com"
-LDAP_ADMIN_PWD_FILE="$(pwd)/tmp/ldap_admin.pwd"
-LDAP_CONF="$(pwd)/tmp/ldap.conf"
+LDAP_ADMIN_PWD_FILE="$(pwd)/lab/ldap_admin.pwd"
+LDAP_CONF="$(pwd)/lab/ldap.conf"
 
 activate_python_virtualenv
 
-cd "./project"
 if [ ! -e "${LDAP_ADMIN_PWD_FILE}" ]; then
 	print_info "Trying to determine the LDAP admin password"
 
@@ -57,7 +55,8 @@ if [ ! -e "${LDAP_CONF}" ]; then
 	print_changed "LDAP configuration stored in ${LDAP_CONF}"
 fi
 
-export LDAPRC="${LDAP_CONF}"
+LDAPRC="${LDAP_CONF}"
+export LDAPRC
 
 print_info "Getting list of current LDAP users (inetOrgPerson entries)"
 LDAP_USERS="$(
@@ -122,7 +121,7 @@ else
 		dn: ${NEW_USER_DN}
 		changeType: modify
 		add: sshPublicKey
-		sshPublicKey: $(cat ../tmp/ssh/id_ed25519.pub)
+		sshPublicKey: $(cat ./lab/ssh/id_ed25519.pub)
 	EOF
 
 	print_changed "Adding ${NEW_USER_NAME} to the UNIX SSH users group"
@@ -133,7 +132,7 @@ else
 		member: ${NEW_USER_DN}
 	EOF
 
-	KRB5_CONFIG="./ansible/secret/kerberos/krb5.conf"
+	KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
 	export KRB5_CONFIG
 	# Note: if cert-based admin authentication is setup, this will be ignored
 	KRB5_KEYTAB="./ansible/secret/kerberos/admin.keytab"
@@ -161,5 +160,4 @@ else
 	print_info "New user ${NEW_USER_NAME} configured"
 fi
 
-print_newline
-exit 0
+finished

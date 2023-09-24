@@ -1,16 +1,13 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
-print_header "ICINGA CONFIGURATION"
+print_header "08 - ICINGA CONFIGURATION"
 
 activate_python_virtualenv
 
-cd "./project"
-
-LDAPRC="$(pwd)/tmp/ldap.conf"
+LDAPRC="$(pwd)/lab/ldap.conf"
 export LDAPRC
 KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
 export KRB5_CONFIG
@@ -32,5 +29,4 @@ print_info "Icinga configured"
 print_info "Login: root"
 print_info "Pass : $(cat ansible/secret/icinga_web/auth/qtest1/credentials/root/password)"
 
-print_newline
-exit 0
+finished

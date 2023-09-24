@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# FIXME: need to read config file
+
 # Detect if the script is being sourced
 if ! (return 0 2>/dev/null); then
 	echo "The script must be sourced"
@@ -18,13 +20,13 @@ if ! pushd "${SCRIPT_DIR}" > /dev/null; then
 	return 1
 fi
 
-if [ ! -e "./tmp/python-virtualenv/bin/activate" ]; then
+if [ ! -e "./project/lab/python-virtualenv/bin/activate" ]; then
 	echo "Virtual environment not found" >&2
 	popd > /dev/null 2>&1
 	return 1
 fi
 
-source ./tmp/python-virtualenv/bin/activate
+source ./project/lab/python-virtualenv/bin/activate
 export KRB5_CONFIG="$(pwd)/project/ansible/secret/kerberos/krb5.conf"
 export LDAPRC="$(pwd)/tmp/ldap.conf"
 export ANSIBLE_STRATEGY="mitogen_linear"

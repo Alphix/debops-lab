@@ -1,8 +1,7 @@
 #!/bin/bash
 
 set -Eeuo pipefail
-cd "${0%/*}"
-. ./functions.sh
+source "${0%/*}/functions.sh"
 
 print_header "LDAP/KERBEROS CONFIGURATION"
 
@@ -10,44 +9,36 @@ GUEST_NAME="qtest1"
 
 activate_python_virtualenv
 
-# FIXME: this is lame...
-cd "./project"
-
 run_playbook "bootstrap" "${GUEST_NAME}" -e ansible_user=root
 
 # Instead of common, is pki enough?
 run_playbook "common" "${GUEST_NAME}"
 
+print_info "Setting up the LDAP server"
 run_playbook "service/slapd" "${GUEST_NAME}"
-
 # The /dev/null part simulates non-interactive execution
 run_playbook "ldap/init-directory" "${GUEST_NAME}" -e admin_use_password_store=False < /dev/null
 
+print_info "Setting up the Kerberos server"
 run_playbook "service/kerberos_server" "${GUEST_NAME}"
-
 # The /dev/null part simulates non-interactive execution
 run_playbook "kerberos/init-kerberos-admin" "${GUEST_NAME}" < /dev/null
-
 # FIXME: the krb5.conf will contain a hostname which is internal to the qemu network
 KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
 export KRB5_CONFIG
 
+print_info "Setting up userspace integration with LDAP/Keberos on the main server"
 run_playbook "bootstrap-sss" "${GUEST_NAME}"
-
 run_playbook "bootstrap-kerberos" "${GUEST_NAME}"
 
-# Run again to to create a ldap host principal and keytab for slapd
+print_info "Running the slapd role again to integrate it with the Kerberos service"
 run_playbook "service/slapd" "${GUEST_NAME}"
 
-# FIXME: This shouldn't be necessary
-#ssh -F ~/.ssh/debops-lab/ssh_config root@qtest1 systemctl restart slapd
-
+print_info "Setting up userspace integration with LDAP/Keberos on other servers"
 run_playbook "bootstrap-sss" "qtest2" -e ansible_user=root
 run_playbook "bootstrap-kerberos" "qtest2"
-
 run_playbook "bootstrap-sss" "qtest3" -e ansible_user=root
 run_playbook "bootstrap-kerberos" "qtest3"
 
 print_info "Additional VMs configured"
-print_newline
-exit 0
+finished
