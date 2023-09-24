@@ -18,7 +18,7 @@ if [ ! -e "project" ]; then
 	print_changed "Installing DebOps configuration from files/debops.cfg.template to project/.debops.cfg"
 	cp "../files/debops.cfg.template" "./.debops.cfg"
 
-	if $DL_USE_MITOGEN; then
+	if ${DL_USE_MITOGEN}; then
 		MITOGEN_PATH="$(find ../tmp/python-virtualenv/lib/ -name "ansible_mitogen" -type d)/plugins/strategy/"
 		MITOGEN_PATH_ESC="$(echo "${MITOGEN_PATH}" | sed 's/\//\\\//g')"
 		sed -i -e "s/@@ MITOGEN @@/strategy_plugins = ${MITOGEN_PATH_ESC}/" "./.debops.cfg"
@@ -34,12 +34,12 @@ if [ ! -e "project" ]; then
 	rm -rf "./ansible/inventory"
 	cp -a "../files/inventory" "./ansible/inventory"
 
-	if [ ! -z "${DL_CUSTOM_DEBOPS_REPO}" ]; then
+	if [ -n "${DL_CUSTOM_DEBOPS_REPO:-}" ]; then
 		print_changed "Cloning custom DebOps repo ${DL_CUSTOM_DEBOPS_REPO} to project/debops"
 		git clone --quiet "${DL_CUSTOM_DEBOPS_REPO}" debops
 
 		cd "./debops"
-		if [ ! -z "$DL_CUSTOM_DEBOPS_REPO_BRANCH" ]; then
+		if [ -n "${DL_CUSTOM_DEBOPS_REPO_BRANCH:-}" ]; then
 			print_changed "Switching custom DebOps repo to branch ${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
 			git checkout --quiet "${DL_CUSTOM_DEBOPS_REPO_BRANCH}"
 		fi

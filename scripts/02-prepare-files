@@ -61,11 +61,14 @@ function get_file {
 	local URI="${2}"
 
 	if [ -e "${FILE}" ] && [ -e "${ETAG}" ]; then
+		local OLD_CHECKSUM
+		local NEW_CHECKSUM
+
 		print_info "Checking for an updated version of ${FILE}"
 		print_info "URI: ${URI}"
-		local OLD_CHECKSUM="$(sha256sum "${FILE}")"
+		OLD_CHECKSUM="$(sha256sum "${FILE}")"
 		curl -s -o "${FILE}" --etag-compare "${ETAG}" --etag-save "${ETAG}" "${URI}"
-		local NEW_CHECKSUM="$(sha256sum "${FILE}")"
+		NEW_CHECKSUM="$(sha256sum "${FILE}")"
 		if [ "${OLD_CHECKSUM}" = "${NEW_CHECKSUM}" ]; then
 			print_ok "File ${FILE} is already current"
 		else
@@ -79,7 +82,7 @@ function get_file {
 	fi
 
 	if [ ! -e "${FILE}" ]; then
-		print_info "PWD is $PWD"
+		print_info "PWD is ${PWD}"
 		die "File ${FILE} not found"
 	fi
 }
@@ -91,18 +94,24 @@ if [ ! -e "./files/preseed.cfg.template" ]; then
 	die "Preseed template file files/preseed.cfg.template missing"
 elif [ ! -e "./tmp/preseed.cfg" ] || [ "./files/preseed.cfg.template" -nt "./tmp/preseed.cfg" ]; then
 	print_changed "Generating preseed file tmp/preseed.cfg from template files/preseed.cfg.template"
+	SSH_KEYS="$(cat ~/.ssh/debops-lab/*.pub)"
 	cp "./files/preseed.cfg.template" "./tmp/preseed.cfg"
-	echo "d-i passwd/root-password password ${DL_DI_ROOT_PW}" >> ./tmp/preseed.cfg
-	echo "d-i passwd/root-password-again password ${DL_DI_ROOT_PW}" >> ./tmp/preseed.cfg
-	echo "d-i debian-installer/country string ${DL_DI_COUNTRY}" >> ./tmp/preseed.cfg
-	echo "d-i debian-installer/locale string ${DL_DI_LOCALE}" >> ./tmp/preseed.cfg
-	echo "d-i keyboard-configuration/xkb-keymap select ${DL_DI_KEYMAP}" >> ./tmp/preseed.cfg
-	echo "d-i mirror/http/hostname string ${DL_DI_MIRROR}" >> ./tmp/preseed.cfg
-	if [ ! -z "${DL_DI_PROXY}" ]; then
+	cat <<-EOF >> "./tmp/preseed.cfg"
+		d-i passwd/root-password password ${DL_DI_ROOT_PW}
+		d-i passwd/root-password-again password ${DL_DI_ROOT_PW}
+		d-i debian-installer/country string ${DL_DI_COUNTRY}
+		d-i debian-installer/locale string ${DL_DI_LOCALE}
+		d-i keyboard-configuration/xkb-keymap select ${DL_DI_KEYMAP}
+		d-i mirror/http/hostname string ${DL_DI_MIRROR}
+		d-i time/zone string ${DL_DI_TZ}
+		d-i preseed/late_command string in-target sh -c -- "\
+			mkdir -m 700 /root/.ssh; \
+			echo '${SSH_KEYS}' >> /root/.ssh/authorized_keys; \
+			chmod 600 /root/.ssh/authorized_keys"
+		EOF
+	if [ -n "${DL_DI_PROXY:-}" ]; then
 		echo "d-i mirror/http/proxy string ${DL_DI_PROXY}" >> ./tmp/preseed.cfg
 	fi
-	echo "d-i time/zone string ${DL_DI_TZ}" >> ./tmp/preseed.cfg
-	echo "d-i preseed/late_command string in-target sh -c \"mkdir -m 700 /root/.ssh; echo '$(cat ~/.ssh/debops-lab/*.pub)' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys\"" >> ./tmp/preseed.cfg
 else
 	print_ok "Preseed file tmp/preseed.cfg is up to date"
 fi

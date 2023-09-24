@@ -1,0 +1,12 @@
+# Turn on warnings for unquoted variables with safe values
+enable=quote‐safe‐variables
+
+# Turn on warnings for unassigned uppercase variables
+enable=check‐unassigned‐uppercase
+
+# Suggest ${VAR} in place of $VAR
+enable=require-variable-braces
+
+# Allow opening any 'source'd file, even if not specified as input
+external-sources=true
+

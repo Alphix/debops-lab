@@ -19,14 +19,18 @@ run_playbook "bootstrap" "${GUEST_NAME}" -e ansible_user=root
 run_playbook "common" "${GUEST_NAME}"
 
 run_playbook "service/slapd" "${GUEST_NAME}"
+
 # The /dev/null part simulates non-interactive execution
 run_playbook "ldap/init-directory" "${GUEST_NAME}" -e admin_use_password_store=False < /dev/null
 
 run_playbook "service/kerberos_server" "${GUEST_NAME}"
+
 # The /dev/null part simulates non-interactive execution
 run_playbook "kerberos/init-kerberos-admin" "${GUEST_NAME}" < /dev/null
+
 # FIXME: the krb5.conf will contain a hostname which is internal to the qemu network
-export KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
+KRB5_CONFIG="$(pwd)/ansible/secret/kerberos/krb5.conf"
+export KRB5_CONFIG
 
 run_playbook "bootstrap-sss" "${GUEST_NAME}"
 
