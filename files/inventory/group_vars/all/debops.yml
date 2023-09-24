@@ -1,0 +1,3 @@
+# This enables error messages which may contain user passwords, etc
+# Useful for testing, but *not* recommended for a production environment
+debops__no_log: False
