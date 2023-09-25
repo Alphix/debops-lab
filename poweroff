@@ -1,6 +1,0 @@
-#!/bin/bash
-
-ssh -F ~/.ssh/debops-lab/ssh_config root@qtest3 poweroff
-ssh -F ~/.ssh/debops-lab/ssh_config root@qtest2 poweroff
-ssh -F ~/.ssh/debops-lab/ssh_config root@qtest1 poweroff
-ssh -F ~/.ssh/debops-lab/ssh_config root@boot poweroff

@@ -27,7 +27,6 @@ fi
 source ./tmp/python-virtualenv/bin/activate
 export KRB5_CONFIG="$(pwd)/project/ansible/secret/kerberos/krb5.conf"
 export LDAPRC="$(pwd)/tmp/ldap.conf"
-export HOSTALIASES="$(pwd)/hosts"
 export ANSIBLE_STRATEGY="mitogen_linear"
 
 popd > /dev/null
