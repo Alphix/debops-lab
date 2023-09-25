@@ -9,6 +9,7 @@ GUEST_NAME="boot"
 
 activate_python_virtualenv
 
+# FIXME: This should probably move to 02-*
 if [ ! -e ".debops.cfg" ]; then
 	print_changed "Creating DebOps project in directory ${DL_PROJECT_DIR}"
 	debops project init "." > /dev/null
@@ -31,6 +32,15 @@ if [ ! -e ".debops.cfg" ]; then
 	print_changed "Copying inventory from files/inventory to ${DL_PROJECT_DIR}/ansible/inventory"
 	rm -rf "./ansible/inventory"
 	cp -a "../files/inventory" "./ansible/inventory"
+
+	print_changed "Writing custom inventory file to ${DL_PROJECT_DIR}/ansible/inventory/group_vars/all/debops_lab.yml"
+	cat <<-EOF > "./ansible/inventory/group_vars/all/debops_lab.yml"
+		debops_lab__fallback_nameserver: '${DL_NAMESERVER:-}'
+		debops_lab__proxy_host: '${DL_DI_PROXY_HOST:-}'
+		debops_lab__proxy_ip: '${DL_DI_PROXY_IP:-}'
+		debops_lab__proxy: '${DL_DI_PROXY:-}'
+		debops_lab__keymap: '${DL_DI_KEYMAP:-}'
+	EOF
 
 	if [ -n "${DL_CUSTOM_DEBOPS_REPO:-}" ]; then
 		print_changed "Cloning custom DebOps repo ${DL_CUSTOM_DEBOPS_REPO} to ${DL_PROJECT_DIR}/debops"

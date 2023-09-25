@@ -1,0 +1,71 @@
+dnsmasq__dhcpv4: False
+
+dnsmasq__dhcpv6: False
+
+dnsmasq__interfaces:
+
+  - name: 'br2'
+    state: 'absent'
+
+  - name: 'ens4'
+    state: 'present'
+    domain: '{{ ansible_domain }}'
+
+dnsmasq__nameservers: [ '{{ debops_lab__fallback_nameserver }}' ]
+
+dnsmasq__boot_enabled: False
+
+dnsmasq__boot_ipxe_enabled: False
+
+dnsmasq__dns_records:
+
+  - a: 'boot.example.com'
+    ip: '192.168.99.253'
+
+  - a: 'qtest1.example.com'
+    ip: '192.168.99.1'
+
+  - a: 'qtest2.example.com'
+    ip: '192.168.99.2'
+
+  - a: 'qtest3.example.com'
+    ip: '192.168.99.3'
+
+  - a: 'router.example.com'
+    ip: '192.168.99.254'
+
+  - a: '{{ debops_lab__proxy_host }}'
+    ip: '{{ debops_lab__proxy_ip }}'
+
+  - srv: '_syslog._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '6514'
+
+  - srv: '_ldap._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '636'
+
+  - srv: '_smtp._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '465'
+
+  - srv: '_icinga-master._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '5665'
+
+  - srv: '_icinga-director._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '443'
+
+  - srv: '_imaps._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '993'
+
+  - srv: '_submissions._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '465'
+
+  - srv: '_sieve._tcp.example.com'
+    target: 'qtest1.example.com'
+    port: '4190'
+

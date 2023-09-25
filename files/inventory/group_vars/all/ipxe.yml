@@ -1,0 +1,51 @@
+ipxe__debian_netboot_releases: [ 'bookworm' ]
+
+ipxe__debian_netboot_architectures: [ 'amd64' ]
+
+ipxe__scripts:
+
+  - name: 'variables.ipxe'
+    comment: 'iPXE global variables'
+    options:
+
+      - name: 'debian_installer_mirror'
+        comment: 'Debian mirror used during automated installation'
+        value: '{{ debops_lab__proxy }}'
+
+      - name: 'debian_installer_keymap'
+        comment: 'Default keymap to set for the preseeding'
+        value: '{{ debops_lab__keymap }}'
+
+  - name: 'boot/hostname-qtest1.ipxe'
+    raw: |
+      # iPXE boot for qtest1
+      chain --replace --autofree qemu.ipxe
+
+  - name: 'boot/hostname-qtest2.ipxe'
+    raw: |
+      # iPXE boot for qtest2
+      chain --replace --autofree qemu.ipxe
+
+  - name: 'boot/hostname-qtest3.ipxe'
+    raw: |
+      # iPXE boot for qtest3
+      chain --replace --autofree qemu.ipxe
+
+  - name: 'boot/qemu.ipxe'
+    raw: |
+      # iPXE boot for qemu guests
+      isset ${arch_a} || set arch_a amd64
+      isset ${os} || set os debian
+      isset ${os_version} || set os_version bookworm
+      isset ${domain} || set domain ${netX/domain}
+      isset ${local_preseed} || set local_preseed tftp://192.168.99.253/qemu-preseed.ipxe
+      isset ${dir} || set dir /pxe/linux/debian/${os_version}/${arch_a}/current/debian-installer/${arch_a}
+      isset ${install_params} || set install_params auto=true priority=critical preseed/url=${local_preseed} keymap=${debian_installer_keymap} hostname=${hostname} domain=${domain}
+      isset ${boot_params} || set boot_params quiet console=ttyS0,115200,n8
+      imgfree
+      kernel ${dir}/linux initrd=initrd.gz ${install_params} ${boot_params}
+      initrd ${dir}/initrd.gz
+      boot
+
+  - name: 'qemu-preseed.ipxe'
+    raw: '{{ lookup("file", lookup("file_src", "{{ inventory_dir }}/../../lab/preseed.cfg")) }}'

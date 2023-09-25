@@ -1,0 +1,3 @@
+apt_proxy__http_url: '{{ debops_lab__proxy }}'
+
+apt__original_sources: []
