@@ -1,0 +1,4 @@
+nginx_default_name: 'qtest1.example.com'
+
+nginx_default_ssl_name: 'qtest1.example.com'
+
