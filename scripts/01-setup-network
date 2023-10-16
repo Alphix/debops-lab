@@ -96,6 +96,10 @@ add_tap tap2
 add_tap tap3
 add_tap tap253
 
+if ! sudo ip link set "${DL_BRIDGE_NAME}" up; then
+	die "Failed to bring up netdev ${DL_BRIDGE_NAME}"
+fi
+
 if [ ! -r "/proc/sys/net/ipv4/ip_forward" ]; then
 	die "Can't find cat /proc/sys/net/ipv4/ip_forward"
 elif [ "$(cat /proc/sys/net/ipv4/ip_forward)" = "1" ]; then
