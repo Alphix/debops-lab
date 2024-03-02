@@ -209,6 +209,7 @@ function start_vm {
 	QEMU_EXTRA_OPTS+=" -drive file=${QEMU_IMG},format=qcow2,cache=unsafe,if=virtio,aio=io_uring"
 	QEMU_EXTRA_OPTS+=" -device virtio-net,netdev=network0,mac=${GUEST_MAC}"
 	QEMU_EXTRA_OPTS+=" -netdev tap,id=network0,ifname=${GUEST_NETDEV},script=no,downscript=no"
+	QEMU_EXTRA_OPTS+=" -serial mon:stdio"
 	local GUEST_SSH_KNOWN_HOSTS="./lab/ssh/hosts/known_host.${GUEST_NAME}"
 	local GUEST_SSH_CONFIG="./lab/ssh/hosts/${GUEST_NAME}.conf"
 	local SSH_CONFIG="./lab/ssh/ssh_config"
