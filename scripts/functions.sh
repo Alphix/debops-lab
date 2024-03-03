@@ -2,6 +2,10 @@
 # shellcheck disable=SC2034
 # SC2034: Unused variables (index in the for loop and colors)
 
+# Some tools (like ssh) complain if cfg files are group-writeable, even when using
+# https://wiki.debian.org/UserPrivateGroups
+umask 0022
+
 function read_config {
 	if [ ! -e "default.cfg" ]; then
 		die "Couldn't find default.cfg"
@@ -118,6 +122,18 @@ function activate_python_virtualenv {
 		pip3 install debops[ansible] > /dev/null 2>&1
 	fi
 
+	# See:
+	#   - https://github.com/ansible-collections/ansible.utils/pull/338
+	#   - https://github.com/ansible-collections/ansible.utils/issues/331
+	netaddr_version="$(pip3 show netaddr 2> /dev/null | grep "^Version" | cut -d" " -f2)" || true
+	if [ "${netaddr_version}" = "0.9.0" ]; then
+		print_ok "netaddr is installed in the virtual environment"
+	else
+		print_changed "Installing netaddr in the virtual environment"
+		python3 -m pip install 'netaddr==0.9.0'
+		pip3 install netaddr > /dev/null 2>&1
+	fi
+
 	if ${DL_USE_MITOGEN}; then
 		if pip3 show -qqq mitogen; then
 			print_ok "Mitogen is installed in the virtual environment"
@@ -133,6 +149,13 @@ function activate_python_virtualenv {
 			sed -i 's/^ANSIBLE_VERSION_MAX\s*=.*/ANSIBLE_VERSION_MAX = (2, 99)/' \
 				./lab/python-virtualenv/lib/*/site-packages/ansible_mitogen/loaders.py
 			rm -rf ./lab/python-virtualenv/lib/*/site-packages/ansible_mitogen/__pycache__
+
+			# See:
+			#   - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1059935
+			#   - https://github.com/mitogen-hq/mitogen/issues/1034
+			#   - https://github.com/AnatomicJC/mitogen/commit/88c0da39a4c869c46eb21b6b67310ad62785b36c
+			cat ../files/mitogen-debian-bug-1059935.patch | patch -p2 -d ./lab/python-virtualenv/lib/*/site-packages/mitogen/
+			rm -rf ./lab/python-virtualenv/lib/*/site-packages/mitogen/__pycache__
 		fi
 	fi
 }

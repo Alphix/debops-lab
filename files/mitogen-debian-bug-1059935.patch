@@ -1,0 +1,33 @@
+From 88c0da39a4c869c46eb21b6b67310ad62785b36c Mon Sep 17 00:00:00 2001
+From: Jean-Christophe Vassort <anatomicjc@open-web.fr>
+Date: Wed, 3 Jan 2024 15:02:06 +0100
+Subject: [PATCH] Make mitogen work with ansible 2.16.2
+
+https://github.com/mitogen-hq/mitogen/issues/1034#issuecomment-1851557386
+---
+ mitogen/core.py | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/mitogen/core.py b/mitogen/core.py
+index bee722e63..865f8262f 100644
+--- a/mitogen/core.py
++++ b/mitogen/core.py
+@@ -842,6 +842,9 @@ def _unpickle_bytes(self, s, encoding):
+         s, n = LATIN1_CODEC.encode(s)
+         return s
+ 
++    def _unpickle_ansible_unsafe_text(self, serialized_obj):
++        return serialized_obj
++
+     def _find_global(self, module, func):
+         """
+         Return the class implementing `module_name.class_name` or raise
+@@ -860,6 +863,8 @@ def _find_global(self, module, func):
+                 return Secret
+             elif func == 'Kwargs':
+                 return Kwargs
++        elif module == 'ansible.utils.unsafe_proxy' and func == 'AnsibleUnsafeText':
++            return self._unpickle_ansible_unsafe_text
+         elif module == '_codecs' and func == 'encode':
+             return self._unpickle_bytes
+         elif module == '__builtin__' and func == 'bytes':
