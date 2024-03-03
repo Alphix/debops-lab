@@ -130,8 +130,7 @@ function activate_python_virtualenv {
 		print_ok "netaddr is installed in the virtual environment"
 	else
 		print_changed "Installing netaddr in the virtual environment"
-		python3 -m pip install 'netaddr==0.9.0'
-		pip3 install netaddr > /dev/null 2>&1
+		pip3 install 'netaddr==0.9.0' > /dev/null 2>&1
 	fi
 
 	if ${DL_USE_MITOGEN}; then
